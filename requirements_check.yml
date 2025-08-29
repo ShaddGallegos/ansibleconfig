@@ -1,0 +1,32 @@
+---
+- name: Show requirements for AAP setup
+- hosts: localhost
+  gather_facts: false
+  pre_tasks:
+  - name: Show requirements before prompts
+  debug:
+  msg: |
+  Before running the main setup playbook, please ensure you have:
+  1. Red Hat Offline API Token: https://access.redhat.com/management/api
+  2. Ansible Automation Hub Token: https://console.redhat.com/ansible/automation-hub/token
+    3. Red Hat CDN Username and Password (Customer Portal credentials)
+    These will be prompted for and cached in ~/.ansible/config/env.conf for reuse.
+
+- name: Ensure ~/.ansible/config directory exists
+  file:
+  path: "{{ lookup('env','HOME') }}/.ansible/config"
+  state: directory
+  mode: '0700'
+
+- name: Ensure env.conf directory exists
+  file:
+  path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+  state: file
+  mode: '0600'
+
+- name: Ensure env.conf is owned by the user
+  file:
+  path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+  owner: "{{ lookup('env','USER') }}"
+  group: "{{ lookup('env','USER') }}"
+  mode: '0600'

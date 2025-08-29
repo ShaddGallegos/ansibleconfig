@@ -1,0 +1,29 @@
+---
+- name: Prepare RHEL 9 for Ansible Automation Platform Containerized Install
+- hosts: localhost
+  become: true
+  gather_facts: true
+
+  vars_prompt:
+  - name: "rhsm_username"
+  prompt: "Red Hat Customer Portal Username"
+  private: no
+- name: "rhsm_password"
+  prompt: "Red Hat Customer Portal Password"
+  private: yes
+- name: "offline_token"
+  prompt: "Red Hat Offline API Token"
+  private: yes
+- name: "automation_hub_token"
+  prompt: "Ansible Automation Hub Token"
+  private: yes
+- name: "admin_user"
+  prompt: "Admin User for AAP"
+  private: no
+  default: "admin"
+- name: "admin_password"
+  prompt: "Admin Password for AAP"
+  private: yes
+
+  roles:
+  - aap_env_setup

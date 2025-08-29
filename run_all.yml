@@ -1,0 +1,3 @@
+---
+- import_playbook: requirements_check.yml
+- import_playbook: site.yml

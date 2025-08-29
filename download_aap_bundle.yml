@@ -1,0 +1,145 @@
+---
+- name: Download Ansible Automation Platform Setup Bundle
+  hosts: localhost
+  gather_facts: no
+
+  pre_tasks:
+    - name: Ensure ~/.ansible/config directory exists
+      file:
+        path: "{{ lookup('env','HOME') }}/.ansible/config"
+        state: directory
+        mode: '0700'
+
+    - name: Ensure ~/.ansible/config/env.conf exists
+      file:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        state: touch
+        mode: '0600'
+
+    - name: Convert env.conf to valid YAML if needed
+      shell: |
+        awk -F= '/=/{print $1": "$2} !/=/{print $0}' {{ lookup('env','HOME') }}/.ansible/config/env.conf | grep -v '=' > {{ lookup('env','HOME') }}/.ansible/config/env.conf.tmp && mv {{ lookup('env','HOME') }}/.ansible/config/env.conf.tmp {{ lookup('env','HOME') }}/.ansible/config/env.conf
+      args:
+        executable: /bin/bash
+      changed_when: false
+      when: lookup('file', lookup('env','HOME') + '/.ansible/config/env.conf') is search('=')
+
+    - name: Check if offline_token is present
+      set_fact:
+        offline_token_present: "{{ 'present' if offline_token is defined and offline_token|length > 0 else 'absent' }}"
+      no_log: true
+
+    - name: Show token presence status
+      debug:
+        msg: "Offline token is {{ offline_token_present }}"
+
+  vars_files:
+    - "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+
+  vars_prompt:
+    - name: offline_token
+      prompt: "Enter your Red Hat Offline API Token [{% if offline_token is defined and offline_token|length > 0 %}Token Available{% else %}Token Absent{% endif %}]"
+      private: yes
+      default: "{{ offline_token | default('') }}"
+
+    - name: rhel_version
+      prompt: "Enter RHEL version (9 or 10)"
+      private: no
+      default: "{{ rhel_version | default('9') }}"
+
+    - name: setup_type
+      prompt: "Enter setup type (rpm or containerized)"
+      private: no
+      default: "{{ setup_type | default('containerized') }}"
+
+  vars:
+    bundle_url_map:
+      "9":
+        rpm: "https://api.access.redhat.com/management/v1/downloads/content/480/ver=2.5/rhel---9/2.5/x86_64/product-software"
+        containerized: "https://access.cdn.redhat.com/content/origin/files/sha256/bb/bb2eb3d20b11909286a6ecb2d5d9bf9ab7bb66223b74ffd250f2505a7d2dbbdb/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz"
+      "10":
+        rpm: "https://api.access.redhat.com/management/v1/downloads/content/480/ver=2.5/rhel---10/2.5/x86_64/product-software"
+        containerized: "https://access.cdn.redhat.com/content/origin/files/sha256/xx/xx2eb3d20b11909286a6ecb2d5d9bf9ab7bb66223b74ffd250f2505a7d2dbbdb/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz"
+    output_file_map:
+      "9":
+        rpm: "{{ lookup('env','HOME') }}/Downloads/aap-setup-rpm-rhel9.tar.gz"
+        containerized: "{{ lookup('env','HOME') }}/Downloads/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz"
+      "10":
+        rpm: "{{ lookup('env','HOME') }}/Downloads/aap-setup-rpm-rhel10.tar.gz"
+        containerized: "{{ lookup('env','HOME') }}/Downloads/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz"
+
+  tasks:
+    - name: Add offline_token to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^offline_token:'
+        line: "offline_token: {{ offline_token }}"
+        state: present
+        create: yes
+      when: offline_token is defined and offline_token|length > 0
+      no_log: true
+
+    - name: Add rhel_version to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^rhel_version:'
+        line: "rhel_version: {{ rhel_version }}"
+        state: present
+        create: yes
+      when: rhel_version is defined
+
+    - name: Add setup_type to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^setup_type:'
+        line: "setup_type: {{ setup_type }}"
+        state: present
+        create: yes
+      when: setup_type is defined and (setup_type|string)|length > 0
+
+    - name: Get access token from Red Hat
+      uri:
+        url: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
+        method: POST
+        body_format: form-urlencoded
+        return_content: yes
+        body:
+          grant_type: refresh_token
+          client_id: rhsm-api
+          refresh_token: "{{ offline_token }}"
+      register: token_response
+      no_log: true
+
+    - name: Set access token fact
+      set_fact:
+        access_token: "{{ token_response.json.access_token }}"
+      no_log: true
+
+    - name: Set bundle URL and output filename based on user input
+      set_fact:
+        bundle_url: "{{ bundle_url_map[rhel_version|string][setup_type] }}"
+        output_file: "{{ output_file_map[rhel_version|string][setup_type] }}"
+
+    - name: Ensure Downloads directory exists
+      file:
+        path: "{{ lookup('env','HOME') }}/Downloads"
+        state: directory
+        mode: '0755'
+
+    - name: Download AAP setup bundle
+      get_url:
+        url: "{{ bundle_url }}"
+        headers:
+          Authorization: "Bearer {{ access_token }}"
+        dest: "{{ output_file }}"
+        force: yes
+
+    - name: Show first 10 lines of downloaded bundle file for debugging
+      shell: "head -10 {{ output_file }}"
+      register: bundle_head
+      changed_when: false
+      ignore_errors: true
+
+    - name: Debug bundle file head output
+      debug:
+        msg: "First 10 lines of bundle file: {{ bundle_head.stdout }}"

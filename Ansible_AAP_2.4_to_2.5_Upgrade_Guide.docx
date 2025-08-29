@@ -1,0 +1,106 @@
+Differences Between Ansible Automation Platform 2.4 and 2.5
+
+Red Hat Ansible Automation Platform 2.5 introduced several key differences from Ansible Automation Platform 2.4, focusing on a more integrated and user-friendly experience, enhanced Event-Driven Ansible capabilities, and streamlined deployment options.
+
+Key Differences:
+
+1. Unified User Interface
+- AAP 2.5 introduces a single, centralized web UI that combines Ansible Automation Controller, Event-Driven Ansible Controller, and Private Automation Hub.
+- Management is simplified by centralizing authentication, authorization, and Role-Based Access Control (RBAC).
+
+2. Event-Driven Ansible Enhancements
+- Event-Driven Ansible (EDA) is significantly enhanced, with features like event streams for managing event distribution and integration with sources such as GitHub, GitLab, and ServiceNow.
+- Improvements to the ansible.eda collection enable backward compatibility, and documentation has been improved.
+- Direct upgrades from Event-Driven Ansible 2.4 to 2.5 are not supported due to incompatible database migrations.
+
+3. Deployment and Installation
+- In addition to the existing RPM-based installer and Operator, AAP 2.5 supports a new containerized installer for on-premise deployments.
+- Red Hat-tested deployment topologies and inventories make it faster to get started.
+- Mixed environments are possible, with EDA from 2.5 connected to a legacy 2.4 cluster.
+
+4. Dynamic Includes and Attribute Inheritance
+- Ansible 2.5 completes the separation between include_tasks (dynamic) and import_tasks (static). Attributes applied to an include_tasks statement are no longer inherited by the included tasks, unlike in 2.4.
+- Users need to adjust playbooks to use explicit attribute application, blocks, or static imports when necessary.
+
+5. Deprecations and Changes
+- Using Ansible-provided Jinja tests with filter syntax (e.g., result|changed) is deprecated and will display warnings in 2.5. Use the result is changed syntax.
+- Deprecation warnings may appear for parameters like 'username', 'password', and 'host' in network modules. Use network_cli and netconf connection types and set properties in inventory by group.
+
+6. Other Notable Features
+- Automation Calculator: Provides insights into automation job optimization and ROI.
+- Ansible Quick Starts: Interactive, step-by-step guides within the UI.
+- Ansible Lightspeed: Integrates generative AI with IBM watsonx Code Assistant for playbook creation, explanation, and refinement.
+- Integrated Development Tools: Molecule, Linter, and Ansible Navigator are bundled together.
+
+Summary:
+Ansible Automation Platform 2.5 builds upon 2.4 by introducing a more integrated and centralized user experience, enhancing event-driven automation, and providing more flexibility in deployment. Review the Ansible 2.5 Porting Guide when upgrading to understand potential changes to playbooks and ensure a smooth transition.
+
+Factors Influencing Upgrade Time
+
+- Complexity of Your Ansible Environment:
+  - Number of playbooks, roles, and collections.
+  - Use of custom modules or plugins.
+  - Integration with other systems (e.g., CMDBs, monitoring tools).
+  - Size and complexity of your inventory.
+
+- Team’s Experience Level:
+  - Familiarity with Ansible and the upgrade process.
+  - Experience with testing and troubleshooting.
+
+- Extent of Playbook/Role Modifications Required:
+  - Breaking Changes: Significant changes, especially regarding includes and keywords in roles. Playbooks using dynamic include_tasks or roles with variable names that are also keywords may require modification.
+  - Deprecated Features: Features like Jinja tests as filters and certain top-level connection arguments are deprecated. Addressing these warnings will require modifications.
+
+- Testing Requirements:
+  - Thorough testing of upgraded playbooks and roles to ensure compatibility and functionality.
+  - May require new tests or updates to existing ones.
+
+- Downtime Tolerance:
+  - Minimizing downtime is crucial for production environments and can influence the upgrade strategy.
+
+Estimation Framework
+
+- Inventory Analysis: Review your existing inventory and identify potential issues, such as the use of localhost.
+- Backup: Create a full backup of your Ansible Automation Platform 2.4 environment.
+- Upgrade Planning: Review official Red Hat documentation for specific upgrade requirements and supported topologies.
+- Test Environment: Set up a test environment that mirrors production to perform a trial upgrade and thoroughly test playbooks and roles.
+- Identify Breaking Changes: Refer to the Ansible 2.5 Porting Guide to address breaking changes.
+- Address Deprecation Warnings: Modify playbooks and roles to use the new, recommended syntax.
+- Run the Upgrade: Execute the upgrade process in your test environment, addressing any issues.
+- Thorough Testing: Verify the functionality of all playbooks, roles, and integrations.
+- Documentation and Training: Document the upgrade process and train your team on new features and changes.
+
+Conservative Estimate
+
+- For a simple environment: 1–2 weeks, assuming a dedicated and experienced team, a well-defined testing strategy, and minimal breaking changes.
+- For complex environments: Several weeks or months, involving extensive testing, debugging, rewriting playbooks or roles, and integration testing.
+
+Approach the upgrade with a thorough plan, starting with a comprehensive assessment of your current environment, and allocate sufficient time for testing and troubleshooting.
+
+Upgrading Ansible Automation Platform 2.4 to 2.5
+
+Upgrading involves a significant transition, especially with the introduction of the Platform gateway and unified UI. The upgrade path supports most components, except for Event-Driven Ansible 2.4 to 2.5, which is not directly supported.
+
+Pre-Upgrade Considerations
+
+- Review system requirements and network configuration for Ansible Automation Platform 2.5.
+- Back up your 2.4 environment.
+- Capture inventory and instance group details.
+- Upgrade to the latest 2.4 release before starting the upgrade to 2.5.
+- If using EDA 2.4, direct upgrades are not supported. Consult Red Hat documentation or support for guidance.
+- OAuth applications on the 2.4 platform UI are not directly migrated; recreate these after the upgrade.
+- If using managed databases, you may need to migrate to an external database before upgrading.
+
+Upgrade Process (RPM-Based)
+
+- Download the Ansible Automation Platform 2.5 installer package.
+- Configure your inventory file to reflect your desired 2.5 environment. Refer to example inventory files in the documentation.
+- If maintaining a mixed 2.4/2.5 environment, use separate inventory files and upgrade each installation separately. To upgrade to a consistent version, merge your 2.4 inventory data into the 2.5 inventory and run the upgrade only on the 2.5 inventory.
+- Run the Ansible Automation Platform 2.5 installer, pointing it to your configured inventory file.
+- After the upgrade, user accounts from individual 2.4 services will be migrated. Link these accounts within the unified 2.5 platform gateway.
+
+Post-Upgrade Steps and Considerations
+
+- Review and reconfigure authentication methods (LDAP, SSO) within the 2.5 Platform gateway, as legacy configurations are not automatically migrated.
+- Log in to the Ansible Automation Platform UI and verify successful installation of automation controller, automation hub, and Event-Driven Ansible controller.
+- Explore new features in 2.5, including the unified UI, automation calculator, quick starts, Ansible Lightspeed, and enhanced Event-Driven Ansible capabilities.

@@ -1,0 +1,474 @@
+---
+pre_tasks:
+  - name: Pause for requirements review
+    pause:
+      prompt: |
+        Please ensure you have the following before continuing:
+        1. Red Hat Offline API Token: https://access.redhat.com/management/api
+        2. Ansible Automation Hub Token: https://console.redhat.com/ansible/automation-hub/token
+        3. Red Hat CDN Username and Password (Customer Portal credentials)
+        These will be prompted for and cached in ~/.ansible/config/env.conf for reuse.
+  - name: Ensure ~/.ansible/config directory exists
+    file:
+      path: "{{ lookup('env','HOME') }}/.ansible/config"
+      state: directory
+      mode: '0700'
+  - name: "controller_pg_username"
+    prompt: "Enter the Controller PostgreSQL username"
+    private: no
+    default: "admin"
+    when: controller_pg_username is not defined or controller_pg_username|length == 0
+  - name: "controller_pg_password"
+    prompt: "Enter the Controller PostgreSQL password"
+    private: yes
+    default: "redhat"
+    when: controller_pg_password is not defined or controller_pg_password|length == 0
+  - name: "hub_admin_password"
+    prompt: "Enter the Automation Hub admin password"
+    private: yes
+    default: "redhat"
+    when: hub_admin_password is not defined or hub_admin_password|length == 0
+  - name: "hub_pg_host"
+    prompt: "Enter the Automation Hub PostgreSQL host FQDN"
+    private: no
+    default: "externaldb.example.org"
+    when: hub_pg_host is not defined or hub_pg_host|length == 0
+  - name: "hub_pg_database"
+    prompt: "Enter the Automation Hub PostgreSQL database name"
+    private: no
+    default: "aap_hub"
+    when: hub_pg_database is not defined or hub_pg_database|length == 0
+  - name: "hub_pg_username"
+    prompt: "Enter the Automation Hub PostgreSQL username"
+    private: no
+    default: "admin"
+    when: hub_pg_username is not defined or hub_pg_username|length == 0
+  - name: "hub_pg_password"
+    prompt: "Enter the Automation Hub PostgreSQL password"
+    private: yes
+    default: "redhat"
+    when: hub_pg_password is not defined or hub_pg_password|length == 0
+  - name: "eda_admin_password"
+    prompt: "Enter the EDA Controller admin password"
+    private: yes
+    default: "redhat"
+    when: eda_admin_password is not defined or eda_admin_password|length == 0
+  - name: "eda_pg_host"
+    prompt: "Enter the EDA Controller PostgreSQL host FQDN"
+    private: no
+    default: "externaldb.example.org"
+    when: eda_pg_host is not defined or eda_pg_host|length == 0
+  - name: "eda_pg_database"
+    prompt: "Enter the EDA Controller PostgreSQL database name"
+    private: no
+    default: "aap_eda"
+    when: eda_pg_database is not defined or eda_pg_database|length == 0
+  - name: "eda_pg_username"
+    prompt: "Enter the EDA Controller PostgreSQL username"
+    private: no
+    default: "admin"
+    when: eda_pg_username is not defined or eda_pg_username|length == 0
+  - name: "eda_pg_password"
+    prompt: "Enter the EDA Controller PostgreSQL password"
+    private: yes
+    default: "redhat"
+    when: eda_pg_password is not defined or eda_pg_password|length == 0
+  - name: "register_rhsm"
+    prompt: "Register system with Red Hat Subscription Manager? (yes/no)"
+    private: no
+    default: "{{ register_rhsm | default('no') }}"
+    when: register_rhsm is not defined or register_rhsm|length == 0
+  - name: "rhsm_username"
+    prompt: "Red Hat Customer Portal Username (leave blank if not registering)"
+    private: no
+    default: "{{ rhsm_username | default('') }}"
+    when: rhsm_username is not defined or rhsm_username|length == 0
+  - name: "rhsm_password"
+    prompt: "Red Hat Customer Portal Password [{% if rhsm_password is defined and rhsm_password|length > 0 %}Password Available{% else %}Password Absent{% endif %}]"
+    private: yes
+    default: "{{ rhsm_password | default('') }}"
+    when: rhsm_password is not defined or rhsm_password|length == 0
+  - name: "automation_hub_token"
+    prompt: "Ansible Automation Hub for console.redhat.com Token [{% if automation_hub_token is defined and automation_hub_token|length > 0 %}Token Available{% else %}Token Absent{% endif %}]"
+    private: yes
+    default: "{{ automation_hub_token | default('') }}"
+    when: automation_hub_token is not defined or automation_hub_token|length == 0
+  - name: "offline_token"
+    prompt: "Red Hat Offline API Token [{% if offline_token is defined and offline_token|length > 0 %}Token Available{% else %}Token Absent{% endif %}]"
+    private: yes
+    default: "{{ offline_token | default('') }}"
+    when: offline_token is not defined or offline_token|length == 0
+  - name: "rhel_version"
+    prompt: "Enter RHEL version (9 or 10)"
+    private: no
+    default: "{{ rhel_version | default('9') }}"
+    when: rhel_version is not defined or rhel_version|length == 0
+  - name: "setup_type"
+    prompt: "Enter setup type (rpm or containerized)"
+    private: no
+    default: "{{ setup_type | default('containerized') }}"
+    when: setup_type is not defined or setup_type|length == 0
+  - name: "remote_fqdn"
+    prompt: "Enter the FQDN of the remote system to install on"
+    private: no
+    default: "{{ remote_fqdn | default('') }}"
+    when: remote_fqdn is not defined or remote_fqdn|length == 0
+  - name: "remote_ip"
+    prompt: "Enter the IP address of the remote system to install on"
+    private: no
+    default: "{{ remote_ip | default('') }}"
+    when: remote_ip is not defined or remote_ip|length == 0
+  - name: "remote_user"
+    prompt: "Enter the non-root sudo user for the remote system"
+    private: no
+    default: "{{ remote_user | default('') }}"
+    when: remote_user is not defined or remote_user|length == 0
+  - name: "remote_password"
+    prompt: "Enter the password for the remote sudo user"
+    private: yes
+    default: "{{ remote_password | default('') }}"
+    when: remote_password is not defined or remote_password|length == 0
+  - name: "set_hostname"
+    prompt: "Enter the desired hostname (FQDN)"
+    private: no
+    default: "{{ set_hostname | default('') }}"
+    when: set_hostname is not defined or set_hostname|length == 0
+
+tasks:
+  - name: Add register_rhsm to env.conf if missing
+    lineinfile:
+      path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+      regexp: '^register_rhsm:'
+      line: "register_rhsm: {{ register_rhsm }}"
+      state: present
+      create: yes
+    when: register_rhsm is defined and register_rhsm
+  - name: Add remote_fqdn to env.conf if missing
+    lineinfile:
+      path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+      regexp: '^remote_fqdn:'
+      line: "remote_fqdn: {{ remote_fqdn }}"
+      state: present
+      create: yes
+    when: remote_fqdn is defined and remote_fqdn|length > 0
+  - name: Add remote_ip to env.conf if missing
+    lineinfile:
+      path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+      regexp: '^remote_ip:'
+      line: "remote_ip: {{ remote_ip }}"
+      state: present
+      create: yes
+    when: remote_ip is defined and remote_ip|length > 0
+  - name: Add remote_user to env.conf if missing
+    lineinfile:
+      path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+      regexp: '^remote_user:'
+      line: "remote_user: {{ remote_user }}"
+      state: present
+      create: yes
+    when: remote_user is defined and remote_user|length > 0
+  - name: Add remote_password to env.conf if missing
+    lineinfile:
+      path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+      regexp: '^remote_password:'
+      line: "remote_password: {{ remote_password }}"
+      state: present
+      create: yes
+    when: remote_password is defined and remote_password|length > 0
+  - name: Add set_hostname to env.conf if missing
+    lineinfile:
+      path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+      regexp: '^set_hostname:'
+      line: "set_hostname: {{ set_hostname }}"
+      state: present
+      create: yes
+    when: set_hostname is defined and set_hostname|length > 0
+  - name: Add rhsm_username to env.conf if missing
+    lineinfile:
+      path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+      regexp: '^rhsm_username:'
+      line: "rhsm_username: {{ rhsm_username }}"
+      state: present
+      create: yes
+    when: rhsm_username is defined and rhsm_username|length > 0
+  - name: Add rhsm_password to env.conf if missing
+    lineinfile:
+      path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+      regexp: '^rhsm_password:'
+      line: "rhsm_password: {{ rhsm_password }}"
+      state: present
+      create: yes
+    when: rhsm_password is defined and rhsm_password|length > 0
+  - name: Add automation_hub_token to env.conf if missing
+    lineinfile:
+      path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+      regexp: '^automation_hub_token:'
+      line: "automation_hub_token: {{ automation_hub_token }}"
+      state: present
+      create: yes
+    when: automation_hub_token is defined and automation_hub_token|length > 0
+  - name: Add offline_token to env.conf if missing
+    lineinfile:
+      path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+      regexp: '^offline_token:'
+      line: "offline_token: {{ offline_token }}"
+      state: present
+      create: yes
+    when: offline_token is defined and offline_token|length > 0
+  - name: Add rhel_version to env.conf if missing
+    lineinfile:
+      path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+      regexp: '^rhel_version:'
+      line: "rhel_version: {{ rhel_version }}"
+      state: present
+      create: yes
+    when: rhel_version is defined and rhel_version|length > 0
+  - name: Add setup_type to env.conf if missing
+    lineinfile:
+      path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+      regexp: '^setup_type:'
+      line: "setup_type: {{ setup_type }}"
+      state: present
+      create: yes
+    when: setup_type is defined and setup_type|length > 0
+  - name: Set system hostname if requested
+    hostname:
+      name: "{{ set_hostname }}"
+    when: set_hostname | length > 0
+  - name: Gather facts (ensure ansible_facts are available)
+    setup:
+  - name: Set fact for effective hostname
+    set_fact:
+      effective_hostname: "{{ set_hostname if set_hostname | length > 0 else ansible_fqdn }}"
+  - name: Set fact for short hostname
+    set_fact:
+      short_hostname: "{{ effective_hostname.split('.')[0] }}"
+  - name: Add entry to /etc/hosts for system IP, FQDN, and shortname
+    lineinfile:
+      path: /etc/hosts
+      line: "{{ ansible_default_ipv4.address }} {{ effective_hostname }} {{ short_hostname }}"
+      state: present
+      create: yes
+      regexp: "^{{ ansible_default_ipv4.address }}\\s+{{ effective_hostname }}\\s+{{ short_hostname }}$"
+  - name: Register with Red Hat Subscription Manager
+    redhat_subscription:
+      state: present
+      username: "{{ rhsm_username }}"
+      password: "{{ rhsm_password }}"
+      auto_attach: true
+    when: register_rhsm == "yes"
+  - name: Enable required repositories
+    rhsm_repository:
+      name:
+        - rhel-9-for-x86_64-appstream-rpms
+        - rhel-9-for-x86_64-baseos-rpms
+        - ansible-automation-platform-2.5-for-rhelAnsible_Automation_Demo_Using_Ansible_to_Demo-9-x86_64-rpms
+      state: enabled
+  - name: Update all packages
+    dnf:
+      name: "*"
+      state: latest
+  - name: Install required packages
+    dnf:
+      name:
+        - podman
+        - podman-docker
+        - python3
+        - python3-pip
+        - git
+        - tar
+        - unzip
+        - wget
+        - chrony
+        - firewalld
+        - slirp4netns
+        - fuse-overlayfs
+      state: present
+  - name: Ensure firewalld is running and enabled
+    service:
+      name: firewalld
+      state: started
+      enabled: true
+  - name: Ensure chrony is running and enabled
+    service:
+      name: chronyd
+      state: started
+      enabled: true
+  - name: Set SELinux to enforcing
+    ansible.posix.selinux:
+      policy: targeted
+      state: enforcing
+  - name: Install Ansible via pip (latest stable)
+    pip:
+      name: ansible
+      executable: pip3
+  - name: Create admin user for AAP/rootless Podman
+    user:
+      name: "{{ admin_user }}"
+      groups: wheel
+      shell: /bin/bash
+      create_home: yes
+  - name: Add admin user to sudoers
+    copy:
+      dest: "/etc/sudoers.d/{{ admin_user }}"
+      content: "{{ admin_user }} ALL=(ALL) NOPASSWD: ALL\n"
+      mode: '0440'
+  - name: Ensure subuid and subgid are configured for rootless Podman (admin user)
+    lineinfile:
+      path: /etc/subuid
+      line: "{{ admin_user }}:100000:65536"
+      create: yes
+      state: present
+  - name: Ensure subgid is configured for rootless Podman (admin user)
+    lineinfile:
+      path: /etc/subgid
+      line: "{{ admin_user }}:100000:65536"
+      create: yes
+      state: present
+  - name: Ensure user has subuid mapping for rootless Podman (current user)
+    ansible.builtin.lineinfile:
+      path: /etc/subuid
+      line: "{{ lookup('env','USER') }}:100000:65536"
+      create: yes
+      state: present
+  - name: Ensure user has subgid mapping for rootless Podman (current user)
+    ansible.builtin.lineinfile:
+      path: /etc/subgid
+      line: "{{ lookup('env','USER') }}:100000:65536"
+      create: yes
+      state: present
+  - name: Ensure /usr/bin/newuidmap is setuid root
+    ansible.builtin.file:
+      path: /usr/bin/newuidmap
+      mode: '4755'
+  - name: Ensure /usr/bin/newgidmap is setuid root
+    ansible.builtin.file:
+      path: /usr/bin/newgidmap
+      mode: '4755'
+  - name: Ensure admin user has podman config directory
+    file:
+      path: "/home/{{ admin_user }}/.config/containers"
+      state: directory
+      owner: "{{ admin_user }}"
+      group: "{{ admin_user }}"
+      mode: '0700'
+  - name: Copy default registries.conf for podman (rootless)
+    copy:
+      src: /etc/containers/registries.conf
+      dest: "/home/{{ admin_user }}/.config/containers/registries.conf"
+      owner: "{{ admin_user }}"
+      group: "{{ admin_user }}"
+      mode: '0644'
+      ignore_errors: yes
+  - name: Disable swap (recommended for containers)
+    command: swapoff -a
+    when: ansible_swaptotal_mb > 0
+    ignore_errors: true
+  - name: Remove swap entry from /etc/fstab (recommended for containers)
+    replace:
+      path: /etc/fstab
+      regexp: '^([^#].*\s+swap\s+)'
+      replace: '#\1'
+    when: ansible_swaptotal_mb > 0
+    ignore_errors: true
+  - name: Ensure root has an SSH key
+    user:
+      name: root
+      generate_ssh_key: yes
+      ssh_key_bits: 4096
+      ssh_key_file: .ssh/id_rsa
+  - name: Ensure admin user has an SSH key
+    user:
+      name: "{{ admin_user }}"
+      generate_ssh_key: yes
+      ssh_key_bits: 4096
+      ssh_key_file: .ssh/id_rsa
+  - name: Ensure root can SSH to localhost as root
+    authorized_key:
+      user: root
+      state: present
+      key: "{{ lookup('file', '/root/.ssh/id_rsa.pub') }}"
+  - name: Ensure admin user can SSH to localhost as themselves
+    authorized_key:
+      user: "{{ admin_user }}"
+      state: present
+      key: "{{ lookup('file', '/home/' + admin_user + '/.ssh/id_rsa.pub') }}"
+  - name: Ensure admin user can SSH to root
+    authorized_key:
+      user: root
+      state: present
+      key: "{{ lookup('file', '/home/' + admin_user + '/.ssh/id_rsa.pub') }}"
+  - name: Ensure root can SSH to admin user
+    authorized_key:
+      user: "{{ admin_user }}"
+      state: present
+      key: "{{ lookup('file', '/root/.ssh/id_rsa.pub') }}"
+  - name: Prompt for Red Hat offline token
+    vars_prompt:
+      - name: offline_token
+        prompt: "Enter your Red Hat offline token (from API Tokens page)"
+        private: yes
+  - name: Get access token from Red Hat SSO
+    uri:
+      url: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
+      method: POST
+      body_format: form-urlencoded
+      return_content: yes
+      body:
+        grant_type: refresh_token
+        client_id: rhsm-api
+        refresh_token: "{{ offline_token }}"
+    register: sso_response
+  - name: Set access token fact
+    set_fact:
+      access_token: "{{ sso_response.json.access_token }}"
+  - name: Download AAP bundle to ~/Downloads/
+    get_url:
+      url: https://access.cdn.redhat.com/content/origin/files/sha256/bb/bb2eb3d20b11909286a6ecb2d5d9bf9ab7bb66223b74ffd250f2505a7d2dbbdb/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz
+      dest: "{{ lookup('env','HOME') }}/Downloads/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz"
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+  - name: Copy bundle to remote machine
+    ansible.builtin.copy:
+      src: "{{ lookup('env','HOME') }}/Downloads/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz"
+      dest: "~/Downloads/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz"
+    delegate_to: "{{ remote_host | default('REMOTE_HOST') }}"
+  - name: Untar bundle on remote machine
+    ansible.builtin.shell:
+      cmd: "tar zxvf ~/Downloads/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz -C ~/Downloads/"
+    delegate_to: "{{ remote_host | default('REMOTE_HOST') }}"
+    private: true
+
+  - name: Get access token from Red Hat SSO
+    uri:
+      url: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
+      method: POST
+      body_format: form-urlencoded
+      return_content: true
+      body:
+        grant_type: refresh_token
+        client_id: rhsm-api
+        refresh_token: "{{ offline_token }}"
+      register: sso_response
+
+  - name: Set access token fact
+    set_fact:
+      access_token: "{{ sso_response.json.access_token }}"
+
+  - name: Download AAP bundle to ~/Downloads/
+    get_url:
+      url: https://access.cdn.redhat.com/content/origin/files/sha256/bb/bb2eb3d20b11909286a6ecb2d5d9bf9ab7bb66223b74ffd250f2505a7d2dbbdb/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz
+      dest: "{{ lookup('env','HOME') }}/Downloads/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz"
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+
+  - name: Copy bundle to remote machine
+    ansible.builtin.copy:
+    src: "{{ lookup('env','HOME') }}/Downloads/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz"
+    dest: "~/Downloads/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz"
+    delegate_to: "{{ remote_host | default('REMOTE_HOST') }}"
+
+  - name: Untar bundle on remote machine
+    ansible.builtin.shell:
+    cmd: "tar zxvf ~/Downloads/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz -C ~/Downloads/"
+    delegate_to: "{{ remote_host | default('REMOTE_HOST') }}"

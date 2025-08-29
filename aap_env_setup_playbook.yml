@@ -1,0 +1,241 @@
+---
+- name: Local Preparation
+  hosts: localhost
+  connection: local
+  gather_facts: yes
+  become: yes
+  vars_prompt:
+    - name: "remote_fqdn"
+      prompt: "Enter the FQDN of the remote system to install on"
+      private: no
+    - name: "remote_ip"
+      prompt: "Enter the IP address of the remote system to install on"
+      private: no
+    - name: "remote_user"
+      prompt: "Enter the non-root sudo user for the remote system"
+      private: no
+    - name: "remote_password"
+      prompt: "Enter the password for the remote sudo user"
+      private: yes
+    - name: "set_hostname"
+      prompt: "Enter the desired hostname (FQDN)"
+      private: no
+  tasks:
+    - name: Cache remote connection info for future use
+      copy:
+        dest: "{{ ansible_env.HOME }}/.ansible/remote-env.conf"
+        content: |
+          remote_fqdn={{ remote_fqdn }}
+          remote_ip={{ remote_ip }}
+          remote_user={{ remote_user }}
+          remote_password={{ remote_password }}
+          set_hostname={{ set_hostname }}
+        mode: '0600'
+
+    - name: Ensure /etc/hosts has entry for remote node (on local)
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^{{ remote_ip }}[ \t]+{{ remote_fqdn }}'
+        line: '{{ remote_ip }} {{ remote_fqdn }} {{ remote_fqdn.split(".")[0] }}'
+        state: present
+        create: yes
+      become: true
+
+    - name: Copy playbook and resources to remote ~/Downloads
+      synchronize:
+        src: "{{ playbook_dir }}/"
+        dest: "{{ remote_user }}@{{ remote_fqdn }}:~/Downloads/"
+        recursive: yes
+        rsync_opts:
+          - "--exclude=.ansible"
+      vars:
+        ansible_ssh_user: "{{ remote_user }}"
+        ansible_ssh_pass: "{{ remote_password }}"
+
+    - name: Copy SSH key to root@remote_ip
+      ansible.builtin.command:
+        cmd: "ssh-copy-id root@{{ remote_ip }}"
+      ignore_errors: yes
+
+- name: Remote Preparation
+  hosts: "{{ remote_fqdn }}"
+  gather_facts: yes
+  become: yes
+  vars_files:
+    - "{{ ansible_env.HOME }}/.ansible/config/env.conf"
+    - "{{ ansible_env.HOME }}/.ansible/remote-env.conf"
+  tasks:
+    - name: Ensure /etc/hosts has entry for local node (on remote)
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^{{ ansible_default_ipv4.address }}[ \t]+{{ ansible_fqdn }}'
+        line: '{{ ansible_default_ipv4.address }} {{ ansible_fqdn }} {{ ansible_hostname }}'
+        state: present
+        create: yes
+      become: true
+
+    - name: Ensure /etc/hosts has entry for remote node (on remote)
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^{{ remote_ip }}[ \t]+{{ remote_fqdn }}'
+        line: '{{ remote_ip }} {{ remote_fqdn }} {{ remote_fqdn.split(".")[0] }}'
+        state: present
+        create: yes
+      become: true
+
+    - name: Ensure ~/.ansible/config directory exists
+      file:
+        path: "{{ ansible_env.HOME }}/.ansible/config"
+        state: directory
+        mode: '0700'
+
+    - name: Cache credentials and tokens for reuse
+      copy:
+        dest: "{{ ansible_env.HOME }}/.ansible/config/env.conf"
+        content: |
+          rhsm_username={{ rhsm_username }}
+          rhsm_password={{ rhsm_password }}
+          offline_token={{ offline_token }}
+          automation_hub_token={{ automation_hub_token }}
+          set_hostname={{ set_hostname }}
+        mode: '0600'
+
+    - name: Install required packages
+      dnf:
+        name:
+          - podman-docker
+          - python3
+          - python3-pip
+          - tar
+          - slirp4netns
+          - fuse-overlayfs
+          - git
+          - firewalld
+          - chrony
+          - unzip
+        state: present
+
+    - name: Ensure firewalld is running and enabled
+      service:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Ensure chrony is running and enabled
+      service:
+        name: chronyd
+        state: started
+        enabled: true
+
+    - name: Set SELinux to enforcing
+      ansible.posix.selinux:
+        policy: targeted
+        state: enforcing
+
+    - name: Install Ansible via pip (latest stable)
+      pip:
+        name: ansible
+        executable: pip3
+
+    - name: Create admin user for AAP/rootless Podman
+      user:
+        name: "{{ admin_user }}"
+        groups: wheel
+        create_home: yes
+
+    - name: Add admin user to sudoers
+      copy:
+        content: "{{ admin_user }} ALL=(ALL) NOPASSWD: ALL\n"
+        dest: "/etc/sudoers.d/{{ admin_user }}"
+        mode: '0440'
+
+    - name: Ensure subuid and subgid are configured for rootless Podman (admin user)
+      lineinfile:
+        path: /etc/subuid
+        line: "{{ admin_user }}:100000:65536"
+        create: yes
+        state: present
+
+    - name: Ensure subgid is configured for rootless Podman (admin user)
+      lineinfile:
+        path: /etc/subgid
+        line: "{{ admin_user }}:100000:65536"
+        create: yes
+        state: present
+
+    - name: Ensure user has subuid mapping for rootless Podman (current user)
+      ansible.builtin.lineinfile:
+        path: /etc/subuid
+        line: "{{ lookup('env','USER') }}:100000:65536"
+        create: yes
+        state: present
+
+    - name: Ensure user has subgid mapping for rootless Podman (current user)
+      ansible.builtin.lineinfile:
+        path: /etc/subgid
+        line: "{{ lookup('env','USER') }}:100000:65536"
+        create: yes
+        state: present
+
+    - name: Ensure /usr/bin/newuidmap is setuid root
+      ansible.builtin.file:
+        path: /usr/bin/newuidmap
+        mode: '4755'
+
+    - name: Ensure /usr/bin/newgidmap is setuid root
+      ansible.builtin.file:
+        path: /usr/bin/newgidmap
+        mode: '4755'
+
+    - name: Ensure admin user has podman config directory
+      file:
+        path: "{{ ansible_env.HOME }}/.config/containers"
+        state: directory
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+        mode: '0700'
+
+    - name: Copy default registries.conf for podman (rootless)
+      copy:
+        src: /etc/containers/registries.conf
+        dest: "{{ ansible_env.HOME }}/.config/containers/registries.conf"
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+        mode: '0644'
+        ignore_errors: yes
+
+    - name: Remove swap entry from /etc/fstab (recommended for containers)
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*\s+swap\s+)'
+        replace: '#\1'
+      when: ansible_swaptotal_mb > 0
+      ignore_errors: true
+
+    - name: Ensure root has an SSH key
+      user:
+        name: root
+        generate_ssh_key: yes
+        ssh_key_bits: 4096
+        ssh_key_file: .ssh/id_rsa
+
+    - name: Ensure admin user has an SSH key
+      user:
+        name: "{{ admin_user }}"
+        generate_ssh_key: yes
+        ssh_key_bits: 4096
+        ssh_key_file: .ssh/id_rsa
+
+    - name: Set system hostname if needed
+      become: true
+      command: hostnamectl set-hostname {{ set_hostname }}
+      when: ansible_hostname != set_hostname
+
+    - name: Ensure /etc/hosts has entry for this node
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^{{ node_ip }}[ \t]+{{ set_hostname }}'
+        line: '{{ node_ip }} {{ set_hostname }} {{ set_hostname.split(".")[0] }}'
+        state: present
+        create: yes
+      become: true

@@ -1,0 +1,28 @@
+Ansible Configuration Tasks for AAP/Rootless Podman
+
+- Create admin user for AAP/rootless Podman
+  - Add user to wheel group, set shell to /bin/bash, and create home directory.
+
+- Add admin user to sudoers
+  - Configure passwordless sudo access for the admin user.
+
+- Ensure subuid and subgid are configured for rootless Podman (admin user)
+  - Add subuid and subgid mappings in /etc/subuid and /etc/subgid.
+
+- Ensure user has subuid and subgid mapping for rootless Podman (current user)
+  - Add mappings for the current user using environment variables.
+
+- Ensure /usr/bin/newuidmap and /usr/bin/newgidmap are setuid root
+  - Set file permissions to 4755 for both binaries.
+
+- Ensure admin user has Podman config directory
+  - Create .config/containers directory in admin user's home with correct ownership and permissions.
+
+- Copy default registries.conf for Podman (rootless)
+  - Copy system registries.conf to admin user's Podman config directory.
+
+- Disable swap (recommended for containers)
+  - Run swapoff -a if swap is enabled.
+
+- Remove swap entry from /etc/fstab (recommended for containers)
+  - Comment out swap entries in /etc/fstab if swap is enabled.

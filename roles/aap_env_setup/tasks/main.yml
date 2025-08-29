@@ -1,0 +1,390 @@
+---
+- name: Ensure ~/.ansible/config directory exists
+  file:
+    path: "{{ lookup('env','HOME') }}/.ansible/config"
+    state: directory
+    mode: '0700'
+
+- name: Cache credentials and tokens for reuse
+  copy:
+    dest: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+    content: |
+      rhsm_password={{ rhsm_password }}
+      offline_token={{ offline_token }}
+      set_hostname={{ set_hostname }}
+    mode: '0600'
+
+- name: Install required packages
+  dnf:
+    name:
+      - podman-docker
+      - python3
+      - python3-pip
+      - tar
+      - slirp4netns
+      - fuse-overlayfs
+      - git
+      - firewalld
+      - chrony
+      - unzip
+    state: present
+
+- name: Ensure firewalld is running and enabled
+  service:
+    name: firewalld
+    state: started
+    enabled: true
+
+- name: Ensure chrony is running and enabled
+  service:
+    name: chronyd
+    state: started
+    enabled: true
+
+- name: Set SELinux to enforcing
+  ansible.posix.selinux:
+    policy: targeted
+    state: enforcing
+
+- name: Install Ansible via pip (latest stable)
+  pip:
+    name: ansible
+    executable: pip3
+
+- name: Create admin user for AAP/rootless Podman
+  user:
+    name: "{{ admin_user }}"
+    groups: wheel
+    create_home: yes
+
+- name: Add admin user to sudoers
+  copy:
+    dest: "/etc/sudoers.d/{{ admin_user }}"
+    content: "{{ admin_user }} ALL=(ALL) NOPASSWD: ALL\n"
+    mode: '0440'
+
+- name: Ensure subuid is configured for rootless Podman (admin user)
+  lineinfile:
+    path: /etc/subuid
+    line: "{{ admin_user }}:100000:65536"
+    create: yes
+    state: present
+
+- name: Ensure subgid is configured for rootless Podman (admin user)
+  lineinfile:
+    path: /etc/subgid
+    line: "{{ admin_user }}:100000:65536"
+    create: yes
+    state: present
+
+- name: Ensure user has subuid mapping for rootless Podman (current user)
+  ansible.builtin.lineinfile:
+    path: /etc/subuid
+    line: "{{ lookup('env','USER') }}:100000:65536"
+    create: yes
+    state: present
+
+- name: Ensure user has subgid mapping for rootless Podman (current user)
+  ansible.builtin.lineinfile:
+    path: /etc/subgid
+    line: "{{ lookup('env','USER') }}:100000:65536"
+    create: yes
+    state: present
+
+- name: Ensure /usr/bin/newuidmap is setuid root
+  ansible.builtin.file:
+    path: /usr/bin/newuidmap
+    mode: '4755'
+
+- name: Ensure /usr/bin/newgidmap is setuid root
+  ansible.builtin.file:
+    path: /usr/bin/newgidmap
+    mode: '4755'
+
+- name: Ensure admin user has podman config directory
+  file:
+    path: "/home/{{ admin_user }}/.config/containers"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0700'
+
+- name: Copy default registries.conf for podman (rootless)
+  copy:
+    src: /etc/containers/registries.conf
+    dest: "/home/{{ admin_user }}/.config/containers/registries.conf"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0644'
+    ignore_errors: yes
+
+- name: Remove swap entry from /etc/fstab (recommended for containers)
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\s+swap\s+)'
+    replace: '#\1'
+  when: ansible_swaptotal_mb > 0
+  ignore_errors: true
+
+- name: Ensure root has an SSH key
+  user:
+    name: root
+    generate_ssh_key: yes
+    ssh_key_bits: 4096
+    ssh_key_file: .ssh/id_rsa
+
+- name: Ensure admin user has an SSH key
+  user:
+    name: "{{ admin_user }}"
+    generate_ssh_key: yes
+    ssh_key_bits: 4096
+    ssh_key_file: .ssh/id_rsa
+
+- name: Ensure root can SSH to localhost as root
+  authorized_key:
+    user: root
+    state: present
+    key: "{{ lookup('file', '/root/.ssh/id_rsa.pub') }}"
+
+- name: Ensure admin user can SSH to localhost as themselves
+  authorized_key:
+    user: "{{ admin_user }}"
+    state: present
+    key: "{{ lookup('file', '/home/' + admin_user + '/.ssh/id_rsa.pub') }}"
+
+- name: Ensure admin user can SSH to root
+  authorized_key:
+    user: root
+    state: present
+    key: "{{ lookup('file', '/home/' + admin_user + '/.ssh/id_rsa.pub') }}"
+
+- name: Ensure root can SSH to admin user
+  authorized_key:
+    user: "{{ admin_user }}"
+    state: present
+    key: "{{ lookup('file', '/root/.ssh/id_rsa.pub') }}"
+
+- name: Debug message for AAP installation readiness
+  debug:
+    msg: |
+      System is ready for AAP installation.
+      Switch to the admin user with: su - {{ admin_user }}
+      Place your bundle and inventory file, then run:
+        ansible-playbook -i
+
+- name: Get access token from Red Hat SSO
+  uri:
+    url: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
+    method: POST
+    body_format: form-urlencoded
+    return_content: yes
+    body:
+      grant_type: refresh_token
+      client_id: rhsm-api
+      refresh_token: "{{ offline_token }}"
+    register: sso_response
+
+- name: Set access token fact
+  set_fact:
+    access_token: "{{ sso_response.json.access_token }}"
+
+- name: Download AAP bundle to ~/Downloads/
+  get_url:
+    url: https://access.cdn.redhat.com/content/origin/files/sha256/bb/bb2eb3d20b11909286a6ecb2d5d9bf9ab7bb66223b74ffd250f2505a7d2dbbdb/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz
+    dest: "{{ lookup('env','HOME') }}/Downloads/ansible-automation-platform-containerized-setup-bundle-2.5-17-x86_64.tar.gz"
+    headers:
+      Authorization: "Bearer {{ access_token }}"
+
+- name: Ensure ~/.ansible/config directory exists
+  file:
+    path: "{{ lookup('env','HOME') }}/.ansible/config"
+    state: directory
+    mode: '0700'
+
+- name: Cache credentials and tokens for reuse (update)
+  copy:
+    dest: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+    content: |
+      rhsm_password={{ rhsm_password }}
+      offline_token={{ offline_token }}
+      automation_hub_token={{ automation_hub_token }}
+      admin_user={{ admin_user }}
+    mode: '0600'
+
+- name: Install required packages (update)
+  dnf:
+    name:
+      - python3
+      - python3-pip
+      - git
+      - tar
+      - unzip
+      - chrony
+      - firewalld
+      - slirp4netns
+      - fuse-overlayfs
+    state: present
+
+- name: Ensure chrony is running and enabled (update)
+  service:
+    name: chronyd
+    state: started
+    enabled: true
+
+- name: Set SELinux to enforcing (update)
+  ansible.posix.selinux:
+    policy: targeted
+    state: enforcing
+
+- name: Install Ansible via pip (update)
+  pip:
+    name: ansible
+    executable: pip3
+
+- name: Create admin user for AAP/rootless Podman (update)
+  user:
+    name: "{{ admin_user }}"
+    groups: wheel
+    shell: /bin/bash
+    create_home: yes
+
+- name: Add admin user to sudoers (update)
+  copy:
+    dest: "/etc/sudoers.d/{{ admin_user }}"
+    content: "{{ admin_user }} ALL=(ALL) NOPASSWD: ALL\n"
+    mode: '0440'
+
+- name: Ensure subuid is configured for rootless Podman (admin user) (update)
+  lineinfile:
+    path: /etc/subuid
+    line: "{{ admin_user }}:100000:65536"
+    create: yes
+    state: present
+
+- name: Ensure subgid is configured for rootless Podman (admin user) (update)
+  lineinfile:
+    path: /etc/subgid
+    line: "{{ admin_user }}:100000:65536"
+    create: yes
+    state: present
+
+- name: Ensure user has subuid mapping for rootless Podman (current user) (update)
+  ansible.builtin.lineinfile:
+    path: /etc/subuid
+    line: "{{ lookup('env','USER') }}:100000:65536"
+    create: yes
+    state: present
+
+- name: Ensure user has subgid mapping for rootless Podman (current user) (update)
+  ansible.builtin.lineinfile:
+    path: /etc/subgid
+    line: "{{ lookup('env','USER') }}:100000:65536"
+    create: yes
+    state: present
+
+- name: Ensure /usr/bin/newuidmap is setuid root (update)
+  ansible.builtin.file:
+    path: /usr/bin/newuidmap
+    mode: '4755'
+
+- name: Ensure /usr/bin/newgidmap is setuid root (update)
+  ansible.builtin.file:
+    path: /usr/bin/newgidmap
+    mode: '4755'
+
+- name: Ensure admin user has podman config directory (update)
+  file:
+    path: "/home/{{ admin_user }}/.config/containers"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0700'
+
+- name: Copy default registries.conf for podman (rootless) (update)
+  copy:
+    src: /etc/containers/registries.conf
+    dest: "/home/{{ admin_user }}/.config/containers/registries.conf"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0644'
+    ignore_errors: yes
+
+- name: Disable swap (update)
+  command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+  ignore_errors: true
+
+- name: Remove swap entry from /etc/fstab (update)
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\s+swap\s+)'
+    replace: '#\1'
+  when: ansible_swaptotal_mb > 0
+  ignore_errors: true
+
+- name: Ensure root has an SSH key (update)
+  user:
+    name: root
+    generate_ssh_key: yes
+    ssh_key_bits: 4096
+    ssh_key_file: .ssh/id_rsa
+
+- name: Ensure admin user has an SSH key (update)
+  user:
+    name: "{{ admin_user }}"
+    generate_ssh_key: yes
+    ssh_key_bits: 4096
+    ssh_key_file: .ssh/id_rsa
+
+- name: Ensure root can SSH to localhost as root (update)
+  authorized_key:
+    user: root
+    state: present
+    key: "{{ lookup('file', '/root/.ssh/id_rsa.pub') }}"
+
+- name: Ensure admin user can SSH to localhost as themselves (update)
+  authorized_key:
+    user: "{{ admin_user }}"
+    state: present
+    key: "{{ lookup('file', '/home/' + admin_user + '/.ssh/id_rsa.pub') }}"
+
+- name: Ensure admin user can SSH to root (update)
+  authorized_key:
+    user: root
+    state: present
+    key: "{{ lookup('file', '/home/' + admin_user + '/.ssh/id_rsa.pub') }}"
+
+- name: Ensure root can SSH to admin user (update)
+  authorized_key:
+    user: "{{ admin_user }}"
+    state: present
+    key: "{{ lookup('file', '/root/.ssh/id_rsa.pub') }}"
+
+- name: Debug message for AAP installation readiness
+  debug:
+    msg: |
+      System is ready for AAP installation.
+      Switch to the admin user with: su - {{ admin_user }}
+      Place your bundle and inventory file, then run:
+        ansible-playbook -i
+
+- name: Get access token from Red Hat SSO (update)
+  uri:
+    url: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
+    method: POST
+    body_format: form-urlencoded
+    return_content: yes
+    body:
+      grant_type: refresh_token
+      client_id: rhsm-api
+      refresh_token: "{{ offline_token }}"
+    register: sso_response
+
+- name: Set access token fact (update)
+  set_fact:
+    access_token: "{{ sso_response.json.access_token }}"
+
+- name: Install Ansible via pip (latest stable)
+  pip:
+    name: ansible
+    executable: pip3

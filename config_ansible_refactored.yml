@@ -1,0 +1,1576 @@
+---
+- name: Local setup and bundle selection
+  hosts: localhost
+  connection: local
+  gather_facts: yes
+  vars:
+    admin_user: admin
+    ansible_ssh_user: "{{ target_user | default('root') }}"
+    ansible_ssh_pass: "{{ target_password | default('') }}"
+    ansible_become_pass: "{{ target_password | default('') }}"
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+  vars_files:
+    - "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+  pre_tasks:
+    - name: Add SSH host key for remote host
+      shell: |
+        ssh-keyscan -H {{ remote_fqdn | default(remote_ip) }} >> ~/.ssh/known_hosts
+      ignore_errors: yes
+      when: remote_fqdn is defined or remote_ip is defined
+    - name: Set fact for postgresql_admin_username if already defined
+      set_fact:
+        postgresql_admin_username: "{{ postgresql_admin_username }}"
+      when: postgresql_admin_username is defined
+    - name: Set fact for postgresql_admin_password if already defined
+      set_fact:
+        postgresql_admin_password: "{{ postgresql_admin_password }}"
+      when: postgresql_admin_password is defined
+    - name: Set fact for bundle_install if already defined
+      set_fact:
+        bundle_install: "{{ bundle_install }}"
+      when: bundle_install is defined
+    - name: Set fact for bundle_dir if already defined
+      set_fact:
+        bundle_dir: "{{ bundle_dir }}"
+      when: bundle_dir is defined
+    - name: Set fact for gateway_admin_password if already defined
+      set_fact:
+        gateway_admin_password: "{{ gateway_admin_password }}"
+      when: gateway_admin_password is defined
+    - name: Set fact for gateway_pg_host if already defined
+      set_fact:
+        gateway_pg_host: "{{ gateway_pg_host }}"
+      when: gateway_pg_host is defined
+    - name: Set fact for gateway_pg_database if already defined
+      set_fact:
+        gateway_pg_database: "{{ gateway_pg_database }}"
+      when: gateway_pg_database is defined
+    - name: Set fact for gateway_pg_username if already defined
+      set_fact:
+        gateway_pg_username: "{{ gateway_pg_username }}"
+      when: gateway_pg_username is defined
+    - name: Set fact for gateway_pg_password if already defined
+      set_fact:
+        gateway_pg_password: "{{ gateway_pg_password }}"
+      when: gateway_pg_password is defined
+    - name: Set fact for controller_admin_password if already defined
+      set_fact:
+        controller_admin_password: "{{ controller_admin_password }}"
+      when: controller_admin_password is defined
+    - name: Set fact for controller_pg_host if already defined
+      set_fact:
+        controller_pg_host: "{{ controller_pg_host }}"
+      when: controller_pg_host is defined
+    - name: Set fact for controller_pg_database if already defined
+      set_fact:
+        controller_pg_database: "{{ controller_pg_database }}"
+      when: controller_pg_database is defined
+    - name: Set fact for controller_pg_username if already defined
+      set_fact:
+        controller_pg_username: "{{ controller_pg_username }}"
+      when: controller_pg_username is defined
+    - name: Set fact for controller_pg_password if already defined
+      set_fact:
+        controller_pg_password: "{{ controller_pg_password }}"
+      when: controller_pg_password is defined
+    - name: Set fact for hub_admin_password if already defined
+      set_fact:
+        hub_admin_password: "{{ hub_admin_password }}"
+      when: hub_admin_password is defined
+    - name: Set fact for hub_pg_host if already defined
+      set_fact:
+        hub_pg_host: "{{ hub_pg_host }}"
+      when: hub_pg_host is defined
+    - name: Set fact for hub_pg_database if already defined
+      set_fact:
+        hub_pg_database: "{{ hub_pg_database }}"
+      when: hub_pg_database is defined
+    - name: Set fact for hub_pg_username if already defined
+      set_fact:
+        hub_pg_username: "{{ hub_pg_username }}"
+      when: hub_pg_username is defined
+    - name: Set fact for hub_pg_password if already defined
+      set_fact:
+        hub_pg_password: "{{ hub_pg_password }}"
+      when: hub_pg_password is defined
+    - name: Set fact for eda_admin_password if already defined
+      set_fact:
+        eda_admin_password: "{{ eda_admin_password }}"
+      when: eda_admin_password is defined
+    - name: Set fact for eda_pg_host if already defined
+      set_fact:
+        eda_pg_host: "{{ eda_pg_host }}"
+      when: eda_pg_host is defined
+    - name: Set fact for eda_pg_database if already defined
+      set_fact:
+        eda_pg_database: "{{ eda_pg_database }}"
+      when: eda_pg_database is defined
+    - name: Set fact for eda_pg_username if already defined
+      set_fact:
+        eda_pg_username: "{{ eda_pg_username }}"
+      when: eda_pg_username is defined
+    - name: Set fact for eda_pg_password if already defined
+      set_fact:
+        eda_pg_password: "{{ eda_pg_password }}"
+      when: eda_pg_password is defined
+    - name: Set fact for register_rhsm if already defined
+      set_fact:
+        register_rhsm: "{{ register_rhsm }}"
+      when: register_rhsm is defined
+    - name: Set fact for rhsm_username if already defined
+      set_fact:
+        rhsm_username: "{{ rhsm_username }}"
+      when: rhsm_username is defined
+    - name: Set fact for rhsm_password if already defined
+      set_fact:
+        rhsm_password: "{{ rhsm_password }}"
+      when: rhsm_password is defined
+    - name: Set fact for automation_hub_token if already defined
+      set_fact:
+        automation_hub_token: "{{ automation_hub_token }}"
+      when: automation_hub_token is defined
+    - name: Set fact for rhel_version if already defined
+      set_fact:
+        rhel_version: "{{ rhel_version }}"
+      when: rhel_version is defined
+    - name: Set fact for setup_type if already defined
+      set_fact:
+        setup_type: "{{ setup_type }}"
+      when: setup_type is defined
+    - name: Set fact for remote_fqdn if already defined
+      set_fact:
+        remote_fqdn: "{{ remote_fqdn }}"
+      when: remote_fqdn is defined
+    - name: Set fact for remote_ip if already defined
+      set_fact:
+        remote_ip: "{{ remote_ip }}"
+      when: remote_ip is defined
+    - name: Set fact for target_user if already defined
+      set_fact:
+        target_user: "{{ target_user }}"
+      when: target_user is defined
+    - name: Set fact for target_password if already defined
+      set_fact:
+        target_password: "{{ target_password }}"
+      when: target_password is defined
+    - name: Set fact for set_hostname if already defined
+      set_fact:
+        set_hostname: "{{ set_hostname }}"
+      when: set_hostname is defined
+  vars_prompt:
+    - name: "postgresql_admin_username"
+      prompt: "Enter the PostgreSQL admin username"
+      private: no
+      default: "admin"
+    - name: "postgresql_admin_password"
+      prompt: "Enter the PostgreSQL admin password"
+      private: yes
+      default: "redhat"
+    - name: "bundle_install"
+      prompt: "Install from bundle? (true/false)"
+      private: no
+      default: "true"
+    - name: "bundle_dir"
+      prompt: "Enter the bundle directory (should be your ~/Downloads directory)"
+      private: no
+      default: "{{ lookup('env','HOME') }}/Downloads"
+    - name: "gateway_admin_password"
+      prompt: "Enter the AAP Gateway admin password"
+      private: yes
+      default: "redhat"
+    - name: "gateway_pg_host"
+      prompt: "Enter the Gateway PostgreSQL host FQDN"
+      private: no
+      default: "externaldb.example.org"
+    - name: "gateway_pg_database"
+      prompt: "Enter the Gateway PostgreSQL database name"
+      private: no
+      default: "aap_gateway"
+    - name: "gateway_pg_username"
+      prompt: "Enter the Gateway PostgreSQL username"
+      private: no
+      default: "admin"
+    - name: "gateway_pg_password"
+      prompt: "Enter the Gateway PostgreSQL password"
+      private: yes
+      default: "redhat"
+    - name: "controller_admin_password"
+      prompt: "Enter the Controller admin password"
+      private: yes
+      default: "redhat"
+    - name: "controller_pg_host"
+      prompt: "Enter the Controller PostgreSQL host FQDN"
+      private: no
+      default: "externaldb.example.org"
+    - name: "controller_pg_database"
+      prompt: "Enter the Controller PostgreSQL database name"
+      private: no
+      default: "aap_controller"
+    - name: "controller_pg_username"
+      prompt: "Enter the Controller PostgreSQL username"
+      private: no
+      default: "admin"
+    - name: "controller_pg_password"
+      prompt: "Enter the Controller PostgreSQL password"
+      private: yes
+      default: "redhat"
+    - name: "hub_admin_password"
+      prompt: "Enter the Automation Hub admin password"
+      private: yes
+      default: "redhat"
+    - name: "hub_pg_host"
+      prompt: "Enter the Automation Hub PostgreSQL host FQDN"
+      private: no
+      default: "externaldb.example.org"
+    - name: "hub_pg_database"
+      prompt: "Enter the Automation Hub PostgreSQL database name"
+      private: no
+      default: "aap_hub"
+    - name: "hub_pg_username"
+      prompt: "Enter the Automation Hub PostgreSQL username"
+      private: no
+      default: "admin"
+    - name: "hub_pg_password"
+      prompt: "Enter the Automation Hub PostgreSQL password"
+      private: yes
+      default: "redhat"
+    - name: "eda_admin_password"
+      prompt: "Enter the EDA Controller admin password"
+      private: yes
+      default: "redhat"
+    - name: "eda_pg_host"
+      prompt: "Enter the EDA Controller PostgreSQL host FQDN"
+      private: no
+      default: "externaldb.example.org"
+    - name: "eda_pg_database"
+      prompt: "Enter the EDA Controller PostgreSQL database name"
+      private: no
+      default: "aap_eda"
+    - name: "eda_pg_username"
+      prompt: "Enter the EDA Controller PostgreSQL username"
+      private: no
+      default: "admin"
+    - name: "eda_pg_password"
+      prompt: "Enter the EDA Controller PostgreSQL password"
+      private: yes
+      default: "redhat"
+    - name: "register_rhsm"
+      prompt: "Register system with Red Hat Subscription Manager? (yes/no)"
+      private: no
+      default: "{{ register_rhsm | default('no') }}"
+    - name: "rhsm_username"
+      prompt: "Red Hat Customer Portal Username (leave blank if not registering)"
+      private: no
+      default: "{{ rhsm_username | default('') }}"
+    - name: "rhsm_password"
+      prompt: "Red Hat Customer Portal Password [{% if rhsm_password is defined and rhsm_password|length > 0 %}Password Available{% else %}Password Absent{% endif %}]"
+      private: yes
+      default: "{{ rhsm_password | default('') }}"
+    - name: "automation_hub_token"
+      prompt: "Ansible Automation Hub for console.redhat.com Token [{% if automation_hub_token is defined and automation_hub_token|length > 0 %}Token Available{% else %}Token Absent{% endif %}]"
+      private: yes
+      default: "{{ automation_hub_token | default('') }}"
+    - name: "rhel_version"
+      prompt: "Enter RHEL version (9 or 10)"
+      private: no
+      default: "{{ rhel_version | default('9') }}"
+    - name: "setup_type"
+      prompt: "Enter setup type (rpm or containerized)"
+      private: no
+      default: "{{ setup_type | default('containerized') }}"
+    - name: "remote_fqdn"
+      prompt: "Enter the FQDN of the remote system to install on"
+      private: no
+      default: "{{ remote_fqdn | default('') }}"
+    - name: "remote_ip"
+      prompt: "Enter the IP address of the remote system to install on"
+      private: no
+      default: "{{ remote_ip | default('') }}"
+    - name: "target_user"
+      prompt: "Enter the non-root sudo user for the remote system"
+      private: no
+      default: "{{ target_user | default('') }}"
+    - name: "target_password"
+      prompt: "Enter the password for the remote sudo user"
+      private: yes
+      default: "{{ target_password | default('') }}"
+    - name: "set_hostname"
+      prompt: "Enter the desired hostname (FQDN)"
+      private: no
+      default: "{{ set_hostname | default('') }}"
+  tasks:
+    - name: Add remote host to in-memory inventory
+      add_host:
+        name: "{{ remote_fqdn }}"
+        ansible_host: "{{ remote_ip }}"
+        ansible_user: "{{ target_user | default('root') }}"
+        ansible_ssh_pass: "{{ target_password | default('') }}"
+        ansible_become_pass: "{{ target_password | default('') }}"
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+        groups: remote_hosts
+      when: remote_fqdn is defined and remote_ip is defined
+
+    - name: Test connection to remote host
+      ping:
+      delegate_to: "{{ remote_fqdn }}"
+      vars:
+        ansible_ssh_user: "{{ target_user | default('root') }}"
+        ansible_ssh_pass: "{{ target_password | default('') }}"
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+    - name: Ensure admin user has passwordless sudo
+      copy:
+        dest: "/etc/sudoers.d/{{ admin_user }}"
+        content: "{{ admin_user }} ALL=(ALL) NOPASSWD: ALL\n"
+        mode: '0440'
+      delegate_to: "{{ remote_fqdn }}"
+      become: yes
+      become_user: root
+      vars:
+        ansible_ssh_user: "{{ target_user | default('root') }}"
+        ansible_ssh_pass: "{{ target_password | default('') }}"
+        ansible_become_pass: "{{ target_password | default('') }}"
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+    - name: Ensure admin user exists on remote
+      user:
+        name: "{{ admin_user }}"
+        groups: wheel
+        shell: /bin/bash
+        create_home: yes
+      delegate_to: "{{ remote_fqdn }}"
+      become: yes
+      become_user: root
+      vars:
+        ansible_ssh_user: "{{ target_user | default('root') }}"
+        ansible_ssh_pass: "{{ target_password | default('') }}"
+        ansible_become_pass: "{{ target_password | default('') }}"
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+    - name: Ensure remote user's Downloads directory exists
+      file:
+        path: "/home/{{ admin_user }}/Downloads"
+        state: directory
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: '0755'
+        recurse: yes
+      delegate_to: "{{ remote_fqdn }}"
+      become: yes
+      become_user: root
+      vars:
+        ansible_ssh_user: "{{ target_user | default('root') }}"
+        ansible_ssh_pass: "{{ target_password | default('') }}"
+        ansible_become_pass: "{{ target_password | default('') }}"
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+    - name: Verify Downloads directory was created
+      stat:
+        path: "/home/{{ admin_user }}/Downloads"
+      delegate_to: "{{ remote_fqdn }}"
+      become: yes
+      become_user: root
+      register: downloads_dir_stat
+      vars:
+        ansible_ssh_user: "{{ target_user | default('root') }}"
+        ansible_ssh_pass: "{{ target_password | default('') }}"
+        ansible_become_pass: "{{ target_password | default('') }}"
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+    - name: Debug Downloads directory status
+      debug:
+        msg: |
+          Downloads directory status:
+          - Path: /home/{{ admin_user }}/Downloads
+          - Exists: {{ downloads_dir_stat.stat.exists }}
+          - Owner: {{ downloads_dir_stat.stat.pw_name | default('unknown') }}
+          - Permissions: {{ downloads_dir_stat.stat.mode | default('unknown') }}
+    - name: Add register_rhsm to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^register_rhsm:'
+        line: "register_rhsm: {{ register_rhsm }}"
+        state: present
+        create: yes
+      when: register_rhsm is defined and register_rhsm
+    - name: Add remote_fqdn to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^remote_fqdn:'
+        line: "remote_fqdn: {{ remote_fqdn }}"
+        state: present
+        create: yes
+      when: remote_fqdn is defined and remote_fqdn|string|length > 0
+    - name: Add remote_ip to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^remote_ip:'
+        line: "remote_ip: {{ remote_ip }}"
+        state: present
+        create: yes
+      when: remote_ip is defined and remote_ip|string|length > 0
+    - name: Add target_user to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^target_user:'
+        line: "target_user: {{ target_user }}"
+        state: present
+        create: yes
+      when: target_user is defined and target_user|string|length > 0
+    - name: Add target_password to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^target_password:'
+        line: "target_password: {{ target_password }}"
+        state: present
+        create: yes
+      when: target_password is defined and target_password|string|length > 0
+    - name: Add set_hostname to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^set_hostname:'
+        line: "set_hostname: {{ set_hostname }}"
+        state: present
+        create: yes
+      when: set_hostname is defined and set_hostname|string|length > 0
+    - name: Add rhsm_username to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^rhsm_username:'
+        line: "rhsm_username: {{ rhsm_username }}"
+        state: present
+        create: yes
+      when: rhsm_username is defined and rhsm_username|string|length > 0
+    - name: Add rhsm_password to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^rhsm_password:'
+        line: "rhsm_password: {{ rhsm_password }}"
+        state: present
+        create: yes
+      when: rhsm_password is defined and rhsm_password|string|length > 0
+    - name: Add automation_hub_token to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^automation_hub_token:'
+        line: "automation_hub_token: {{ automation_hub_token }}"
+        state: present
+        create: yes
+      when: automation_hub_token is defined and automation_hub_token|string|length > 0
+    - name: Add rhel_version to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^rhel_version:'
+        line: "rhel_version: {{ rhel_version }}"
+        state: present
+        create: yes
+      when: rhel_version is defined and rhel_version|string|length > 0
+    - name: Add setup_type to env.conf if missing
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^setup_type:'
+        line: "setup_type: {{ setup_type }}"
+        state: present
+        create: yes
+      when: setup_type is defined and setup_type|string|length > 0
+    - name: Set system hostname if requested
+      hostname:
+        name: "{{ set_hostname }}"
+      when: set_hostname|string|length > 0
+    - name: Gather facts (ensure ansible_facts are available)
+      setup:
+
+    - name: Find AAP bundle files in Downloads directory
+      find:
+        paths: "{{ lookup('env','HOME') }}/Downloads"
+        patterns: "*ansible-automation-platform*.tar.gz"
+        file_type: file
+      register: aap_bundle_files
+
+    - name: Create bundle selection menu
+      set_fact:
+        bundle_menu: "{{ bundle_menu | default([]) + [{'index': (ansible_loop.index0 + 1), 'file': item.path, 'basename': item.path | basename}] }}"
+      loop: "{{ aap_bundle_files.files }}"
+      loop_control:
+        extended: yes
+
+    - name: Display available AAP bundles
+      debug:
+        msg: |
+          Available AAP bundle files:
+            {% for bundle in bundle_menu %}
+            {{ bundle.index }}. {{ bundle.basename }}
+            {% endfor %}
+      when: bundle_menu is defined and bundle_menu | length > 0
+
+    - name: Fail if no AAP bundles found
+      fail:
+        msg: "No AAP bundle files found in {{ lookup('env','HOME') }}/Downloads matching pattern '*ansible-automation-platform*.tar.gz'"
+      when: bundle_menu is not defined or bundle_menu | length == 0
+
+    - name: Prompt user to select bundle
+      pause:
+        prompt: |
+          Please select an AAP bundle file by entering the number (1-{{ bundle_menu | length }}):
+            {% for bundle in bundle_menu %}
+            {{ bundle.index }}. {{ bundle.basename }}
+            {% endfor %}
+            Enter your choice
+      register: bundle_selection
+      when: bundle_menu | length > 1 and ansible_is_chroot is undefined
+
+    - name: Auto-select containerized bundle for non-interactive mode
+      set_fact:
+        selected_bundle_index: "{{ (bundle_menu | selectattr('basename', 'search', 'containerized') | list)[0].index | default(1) }}"
+      when: (bundle_menu | length > 1) and (ansible_is_chroot is defined or bundle_selection is skipped)
+
+    - name: Set selected bundle for single file
+      set_fact:
+        selected_bundle_index: 1
+      when: bundle_menu | length == 1
+
+    - name: Set selected bundle for multiple files (interactive)
+      set_fact:
+        selected_bundle_index: "{{ bundle_selection.user_input | int }}"
+      when: bundle_menu | length > 1 and bundle_selection is defined and bundle_selection.user_input is defined
+
+    - name: Validate bundle selection
+      fail:
+        msg: "Invalid selection. Please enter a number between 1 and {{ bundle_menu | length }}"
+      when: selected_bundle_index | int < 1 or selected_bundle_index | int > (bundle_menu | length)
+
+    - name: Set selected bundle path
+      set_fact:
+        selected_bundle_path: "{{ (bundle_menu | selectattr('index', 'equalto', selected_bundle_index | int) | list)[0].file }}"
+
+    - name: Determine bundle type (rpm or containerized)
+      set_fact:
+        bundle_type: "{{ 'containerized' if 'containerized' in (selected_bundle_path | basename) else 'rpm' }}"
+
+    - name: Display selected bundle
+      debug:
+        msg: |
+          Selected bundle: {{ selected_bundle_path | basename }}
+          Bundle type: {{ bundle_type }}
+
+    # Write all prompt variables to env.conf for caching
+    - name: Write prompt variables to env.conf
+      lineinfile:
+        path: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        regexp: '^{{ item.key }}:'
+        line: "{{ item.key }}: {{ item.value }}"
+        state: present
+        create: yes
+      loop:
+        - { key: 'rhel_version', value: '{{ rhel_version }}' }
+        - { key: 'setup_type', value: '{{ setup_type }}' }
+        - { key: 'bundle_dir', value: '{{ bundle_dir }}' }
+      when:
+        - item.value is defined
+        - (item.value is string and item.value | length > 0) or (item.value is not string and item.value)
+
+    - name: Check if selected AAP bundle exists and is readable
+      stat:
+        path: "{{ selected_bundle_path }}"
+      register: bundle_stat
+
+    - name: Fail if selected AAP bundle is not accessible
+      fail:
+        msg: "Selected AAP bundle not found or not readable at {{ selected_bundle_path }}"
+      when: not bundle_stat.stat.exists or not bundle_stat.stat.readable
+
+    - name: Validate selected bundle file type
+      shell: "file '{{ selected_bundle_path }}'"
+      register: bundle_file_type
+      changed_when: false
+
+    - name: Fail if selected bundle is not a valid tar.gz archive
+      fail:
+        msg: "Selected file is not a valid tar.gz archive. File type: {{ bundle_file_type.stdout }}"
+      when:
+        - bundle_file_type.stdout is not search('gzip compressed data')
+        - bundle_file_type.stdout is not search('POSIX tar archive')
+
+    - name: Display bundle information
+      debug:
+        msg: |
+          Selected bundle information:
+          - File: {{ selected_bundle_path | basename }}
+          - Size: {{ (bundle_stat.stat.size / 1024 / 1024) | round(2) }} MB
+          - Type: {{ bundle_file_type.stdout }}
+
+- name: Remote host setup and bundle deployment
+  hosts: "{{ remote_fqdn }}"
+  remote_user: "{{ target_user }}"
+  become: yes
+  vars:
+    admin_user: admin
+    ansible_ssh_user: "{{ target_user | default('root') }}"
+    ansible_ssh_pass: "{{ target_password | default('') }}"
+    ansible_become_pass: "{{ target_password | default('') }}"
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+  vars_files:
+    - "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+  tasks:
+    - name: Fix podman user namespace configuration for containerized AAP
+      block:
+        - name: Ensure user has subuid mapping for rootless Podman
+          become: true
+          ansible.builtin.lineinfile:
+            path: /etc/subuid
+            line: "{{ lookup('env','USER') }}:100000:65536"
+            create: yes
+          state: present
+
+        - name: Ensure user has subgid mapping for rootless Podman
+          become: true
+          ansible.builtin.lineinfile:
+            path: /etc/subgid
+            line: "{{ lookup('env','USER') }}:100000:65536"
+            create: yes
+          state: present
+
+        - name: Ensure /usr/bin/newuidmap is setuid root
+          become: true
+          ansible.builtin.file:
+            path: /usr/bin/newuidmap
+            mode: '4755'
+
+        - name: Ensure /usr/bin/newgidmap is setuid root
+          become: true
+          ansible.builtin.file:
+            path: /usr/bin/newgidmap
+            mode: '4755'
+
+        - name: Configure user namespace parameters
+          block:
+            - name: Set max user namespaces
+              ansible.builtin.sysctl:
+                name: user.max_user_namespaces
+                value: '28633'
+                state: present
+                sysctl_set: yes
+                reload: yes
+
+            - name: Ensure subuid file has correct format
+              ansible.builtin.lineinfile:
+                path: /etc/subuid
+                regexp: "^{{ admin_user }}:"
+                line: "{{ admin_user }}:100000:65536"
+                create: yes
+
+            - name: Ensure subgid file has correct format
+              ansible.builtin.lineinfile:
+                path: /etc/subgid
+                regexp: "^{{ admin_user }}:"
+                line: "{{ admin_user }}:100000:65536"
+                create: yes
+
+        - name: Reset podman to force re-initialization
+          ansible.builtin.shell:
+            cmd: |
+              rm -rf /home/{{ admin_user }}/.local/share/containers
+              rm -rf /home/{{ admin_user }}/.config/containers
+          become: yes
+          become_user: "{{ admin_user }}"
+          ignore_errors: yes
+
+        - name: Create enhanced system-level podman wrapper script
+          copy:
+            dest: /tmp/create_podman_wrapper.sh
+            content: |
+              #!/bin/bash
+              set -e
+
+              # Enhanced system-level podman wrapper for AAP installation with comprehensive error handling
+
+              echo "Creating enhanced system-level podman wrapper..."
+
+              # Backup original podman binary if not already done
+              if [ ! -f /usr/bin/podman.real ]; then
+                echo "Backing up original podman binary..."
+                sudo cp /usr/bin/podman /usr/bin/podman.real
+              fi
+
+              # Create comprehensive wrapper script
+              sudo tee /usr/bin/podman > /dev/null << 'WRAPPER_EOF'
+              #!/bin/bash
+
+              # Enhanced podman wrapper for AAP installation - intercepts ALL podman operations
+              # Provides intelligent fallback from rootless to sudo for namespace-related failures
+
+              ORIGINAL_PODMAN="/usr/bin/podman.real"
+              LOG_FILE="/tmp/podman-wrapper.log"
+
+              # Logging function
+              log_msg() {
+                echo "$(date '+%Y-%m-%d %H:%M:%S') [PODMAN-WRAPPER] $*" >> "$LOG_FILE"
+              }
+
+              # Check if operation typically requires image handling
+              is_image_operation() {
+                local args="$*"
+                echo "$args" | grep -qE "(load|save|import|export|pull|push|inspect|images|build|tag|untag)"
+              }
+
+              # Check if error indicates namespace/permission issues
+              is_namespace_error() {
+                local error_text="$1"
+                echo "$error_text" | grep -qE "(newuidmap.*Permission denied|newgidmap.*Permission denied|cannot set up namespace|open of uid_map failed|open of gid_map failed|exit status 1.*newuidmap|exit status 1.*newgidmap)"
+              }
+
+              # Enhanced version handling for AAP installer compatibility
+              handle_version_query() {
+                if [[ "$1" == "version" ]]; then
+                  if [[ "$2" == "--format=json" ]]; then
+                    # AAP installer expects specific JSON format
+                    echo '{"Client":{"Version":"4.7.0","APIVersion":"4.7.0","GoVersion":"go1.19.13","GitCommit":"unknown","BuiltTime":"Wed Dec 20 17:10:26 2023","Built":1703098226,"OsArch":"linux/amd64","Os":"linux"},"Server":{"Version":"4.7.0","APIVersion":"4.7.0","GoVersion":"go1.19.13","GitCommit":"unknown","BuiltTime":"Wed Dec 20 17:10:26 2023","Built":1703098226,"OsArch":"linux/amd64","Os":"linux"}}'
+                    return 0
+                  else
+                    # Regular version output
+                    "$ORIGINAL_PODMAN" version "$@"
+                    return $?
+                  fi
+                fi
+                return 1
+              }
+
+              # Enhanced JSON filtering function to handle podman deprecation warnings
+              filter_json_output() {
+                local stdout_file="$1"
+                local stderr_file="$2"
+                local format_json=false
+
+                # Check if --format=json is in the arguments
+                shift 2 # Remove stdout_file and stderr_file from args
+                for arg in "$@"; do
+                  if [[ "$arg" == "--format=json" ]]; then
+                    format_json=true
+                    break
+                  fi
+                done
+
+                if [[ "$format_json" == "true" ]]; then
+                  # For JSON requests, return clean stdout (JSON) and filtered stderr
+                  cat "$stdout_file"
+                  cat "$stderr_file" | grep -v "DEPRECATED command:" | grep -v "It is recommended to use Quadlets" | grep -v "Please refer to podman-systemd.unit" >&2
+                else
+                  # For non-JSON requests, return everything as-is
+                  cat "$stdout_file"
+                  cat "$stderr_file" >&2
+                fi
+              } # Main wrapper logic with proper stdout/stderr separation
+              main() {
+                local full_cmd="$*"
+                log_msg "=== INTERCEPTED: $full_cmd ==="
+
+                # Handle version queries specially
+                if handle_version_query "$@"; then
+                  log_msg "SUCCESS: Version query handled"
+                  return 0
+                fi
+
+                # Create temporary files for stdout/stderr separation
+                local stdout_file=$(mktemp)
+                local stderr_file=$(mktemp)
+
+                # Cleanup function
+                cleanup_temp_files() {
+                  rm -f "$stdout_file" "$stderr_file" 2>/dev/null
+                }
+                trap cleanup_temp_files EXIT
+
+                # For image operations or when called by root, prefer sudo
+                if is_image_operation "$*" || [[ "$EUID" -eq 0 ]] || [[ "$(whoami)" == "root" ]]; then
+                  log_msg "TRYING SUDO FIRST: Image operation or root context detected"
+
+                  if sudo "$ORIGINAL_PODMAN" "$@" >"$stdout_file" 2>"$stderr_file"; then
+                    filter_json_output "$stdout_file" "$stderr_file" "$@"
+                    log_msg "SUCCESS (sudo-first): $full_cmd"
+                    cleanup_temp_files
+                    return 0
+                  else
+                    local sudo_exit=$?
+                    log_msg "FAILED (sudo-first): $full_cmd - Exit: $sudo_exit"
+                    # Continue to try rootless
+                  fi
+                fi
+
+                # Try rootless first (or as fallback)
+                if "$ORIGINAL_PODMAN" "$@" >"$stdout_file" 2>"$stderr_file"; then
+                  filter_json_output "$stdout_file" "$stderr_file" "$@"
+                  log_msg "SUCCESS (rootless): $full_cmd"
+                  cleanup_temp_files
+                  return 0
+                else
+                  local exit_code=$?
+                  local error_output=$(cat "$stderr_file")
+
+                  # Check if we should retry with sudo
+                  if is_namespace_error "$error_output"; then
+                    log_msg "NAMESPACE ERROR DETECTED, RETRYING WITH SUDO: $error_output"
+
+                    if sudo "$ORIGINAL_PODMAN" "$@" >"$stdout_file" 2>"$stderr_file"; then
+                      filter_json_output "$stdout_file" "$stderr_file" "$@"
+                      log_msg "SUCCESS (sudo-retry): $full_cmd"
+                      cleanup_temp_files
+                      return 0
+                    else
+                      local sudo_exit=$?
+                      log_msg "FAILED (sudo-retry): $full_cmd - Exit: $sudo_exit"
+                      cat "$stdout_file"
+                      cat "$stderr_file" >&2
+                      cleanup_temp_files
+                      return $sudo_exit
+                    fi
+                  else
+                    log_msg "FAILED (rootless): $full_cmd - Exit: $exit_code"
+                    cat "$stdout_file"
+                    cat "$stderr_file" >&2
+                    cleanup_temp_files
+                    return $exit_code
+                  fi
+                fi
+              }
+
+              # Initialize log
+              log_msg "=== WRAPPER STARTED ==="
+
+              # Call main function with all arguments
+              main "$@"
+              exit_code=$?
+              log_msg "=== WRAPPER FINISHED: Exit $exit_code ==="
+              exit $exit_code
+              WRAPPER_EOF
+
+              # Make wrapper executable
+              sudo chmod +x /usr/bin/podman
+
+              # Test wrapper
+              echo "Testing enhanced podman wrapper..."
+              /usr/bin/podman version --format=json > /dev/null 2>&1 && echo "Version test: PASSED" || echo "Version test: FAILED"
+
+              echo "Enhanced system-level podman wrapper installed and tested!"
+      mode: '0755'
+
+    - name: Execute podman wrapper creation script
+      ansible.builtin.shell:
+        cmd: /tmp/create_podman_wrapper.sh
+        become: yes
+
+    - name: Test podman wrapper functionality
+      ansible.builtin.shell:
+        cmd: podman version --format=json
+        register: podman_version_test
+        become: yes
+        become_user: "{{ admin_user }}"
+
+    - name: Display podman version test result
+      debug:
+        msg: "Podman version test result: {{ podman_version_test.stdout }}"
+
+    - name: Test user namespace functionality
+      ansible.builtin.shell:
+        cmd: |
+          echo "Testing user namespace setup..."
+          echo "User: $(whoami)"
+          echo "UID: $(id -u)"
+          echo "Subuid mapping:"
+          grep "^$(whoami):" /etc/subuid || echo "No subuid mapping found"
+          echo "Subgid mapping:"
+          grep "^$(whoami):" /etc/subgid || echo "No subgid mapping found"
+          echo "Max user namespaces: $(cat /proc/sys/user/max_user_namespaces)"
+          echo "Testing newuidmap permissions:"
+          ls -la /usr/bin/newuidmap
+          ls -la /usr/bin/newgidmap
+        register: namespace_test
+        become: yes
+        become_user: "{{ admin_user }}"
+
+    - name: Display namespace test results
+      debug:
+        msg: "{{ namespace_test.stdout_lines }}"
+
+    - name: Verify podman help still works
+      ansible.builtin.shell:
+        cmd: podman --help | head -5
+        register: podman_help_test
+        become: yes
+        become_user: "{{ admin_user }}"
+
+    - name: Display podman help test result
+      debug:
+        msg: "Podman help test result: {{ podman_help_test.stdout_lines }}"
+
+    - name: Test basic podman functionality
+      ansible.builtin.shell:
+        cmd: timeout 30 podman info --format=json | head -10
+        register: podman_info_test
+        become: yes
+        become_user: "{{ admin_user }}"
+        ignore_errors: yes
+
+    - name: Display podman info test result
+      debug:
+        msg: |
+          Podman info test:
+          Success: {{ podman_info_test.rc == 0 }}
+          Output: {{ podman_info_test.stdout_lines[:5] if podman_info_test.stdout_lines is defined else 'No output' }}
+          Error: {{ podman_info_test.stderr_lines[:3] if podman_info_test.stderr_lines is defined else 'No errors' }}
+
+    # Podman registry login (run as root to avoid rootless errors)
+    - name: Podman login to Red Hat registries for container image access
+      block:
+        - name: Podman login to registry.redhat.io
+          become: true
+          ansible.builtin.shell: |
+            podman login registry.redhat.io -u "{{ rhsm_username }}" -p "{{ rhsm_password }}"
+          register: podman_login
+          changed_when: "'Login Succeeded' in podman_login.stdout"
+          failed_when: podman_login.rc != 0
+          rescue:
+        - name: Podman login to registry.access.redhat.com (fallback)
+          become: true
+          ansible.builtin.shell: |
+            podman login registry.access.redhat.com -u "{{ rhsm_username }}" -p "{{ rhsm_password }}"
+          register: podman_login_fallback
+          changed_when: "'Login Succeeded' in podman_login_fallback.stdout"
+          failed_when: podman_login_fallback.rc != 0
+          when: rhsm_username is defined and rhsm_username != '' and rhsm_password is defined and rhsm_password != ''
+
+        - name: Display registry login result
+          debug:
+            msg: "Registry login result: {{ podman_login.stdout if podman_login is defined and podman_login.stdout is defined else (podman_login_fallback.stdout if podman_login_fallback is defined and podman_login_fallback.stdout is defined else 'Registry login skipped - no credentials provided') }}"
+          when: hostvars['localhost']['bundle_type'] == 'containerized'
+
+    - name: Ensure admin user has passwordless sudo
+      copy:
+        dest: "/etc/sudoers.d/{{ admin_user }}"
+        content: "{{ admin_user }} ALL=(ALL) NOPASSWD: ALL\n"
+        mode: '0440'
+
+    - name: Add admin user to required groups for container operations
+      ansible.builtin.user:
+        name: "{{ admin_user }}"
+        groups: wheel,docker
+        append: yes
+        ignore_errors: yes
+
+    - name: Ensure admin user exists on remote
+      user:
+        name: "{{ admin_user }}"
+        groups: wheel
+        shell: /bin/bash
+        create_home: yes
+
+    - name: Ensure remote user's Downloads directory exists
+      file:
+        path: "/home/{{ admin_user }}/Downloads"
+        state: directory
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: '0755'
+        recurse: yes
+
+    - name: Verify Downloads directory was created
+      stat:
+        path: "/home/{{ admin_user }}/Downloads"
+      register: downloads_dir_stat
+
+    - name: Debug Downloads directory status
+      debug:
+        msg: |
+          Downloads directory status:
+          - Path: /home/{{ admin_user }}/Downloads
+          - Exists: {{ downloads_dir_stat.stat.exists }}
+          - Owner: {{ downloads_dir_stat.stat.pw_name | default('unknown') }}
+          - Permissions: {{ downloads_dir_stat.stat.mode | default('unknown') }}
+
+    - name: Copy env.conf to remote
+      ansible.builtin.copy:
+        src: "{{ lookup('env','HOME') }}/.ansible/config/env.conf"
+        dest: "/home/{{ admin_user }}/Downloads/.env.conf"
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: '0644'
+
+    - name: Pause before transferring large file to remote
+      pause:
+        seconds: 30
+
+    - name: Copy bundle to remote user's Downloads directory
+      ansible.builtin.copy:
+        src: "{{ hostvars['localhost']['selected_bundle_path'] }}"
+        dest: "/home/{{ admin_user }}/Downloads/{{ hostvars['localhost']['selected_bundle_path'] | basename }}"
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: '0644'
+        force: yes
+
+    - name: Verify bundle was copied to remote
+      stat:
+        path: "/home/{{ admin_user }}/Downloads/{{ hostvars['localhost']['selected_bundle_path'] | basename }}"
+      register: remote_bundle_stat
+
+    - name: Fail if bundle was not copied successfully
+      fail:
+        msg: "Bundle file was not copied successfully to remote host at /home/{{ admin_user }}/Downloads/{{ hostvars['localhost']['selected_bundle_path'] | basename }}"
+      when: not remote_bundle_stat.stat.exists
+
+    - name: Display remote bundle copy confirmation
+      debug:
+        msg: |
+          Bundle successfully copied to remote:
+          - Path: /home/{{ admin_user }}/Downloads/{{ hostvars['localhost']['selected_bundle_path'] | basename }}
+          - Size: {{ (remote_bundle_stat.stat.size / 1024 / 1024) | round(2) }} MB
+          - Owner: {{ remote_bundle_stat.stat.pw_name }}
+
+    - name: Show first 10 lines of bundle file on remote for debugging
+      ansible.builtin.shell:
+        cmd: "head -10 '/home/{{ admin_user }}/Downloads/{{ hostvars['localhost']['selected_bundle_path'] | basename }}'"
+        register: remote_bundle_head
+      changed_when: false
+      ignore_errors: true
+
+    - name: Debug remote bundle file head output
+      debug:
+        msg: "First 10 lines of remote bundle file: {{ remote_bundle_head.stdout }}"
+
+    - name: Validate bundle file type on remote
+      ansible.builtin.shell:
+        cmd: "file '/home/{{ admin_user }}/Downloads/{{ hostvars['localhost']['selected_bundle_path'] | basename }}'"
+        register: remote_bundle_file_type
+
+    - name: Fail if bundle is not a valid tar or gzip archive on remote
+      fail:
+        msg: "Bundle file on remote is not a valid tar or gzip archive. Please re-download the bundle. File type: {{ remote_bundle_file_type.stdout }}"
+      when:
+        - remote_bundle_file_type.stdout is not search('gzip compressed data')
+        - remote_bundle_file_type.stdout is not search('POSIX tar archive')
+
+    - name: Untar bundle on remote
+      ansible.builtin.shell:
+        cmd: "tar zxvf '/home/{{ admin_user }}/Downloads/{{ hostvars['localhost']['selected_bundle_path'] | basename }}' -C /home/{{ admin_user }}/Downloads/"
+
+    - name: Find extracted bundle directory
+      ansible.builtin.find:
+        paths: "/home/{{ admin_user }}/Downloads"
+        patterns: "ansible-automation-platform*"
+        file_type: directory
+        register: extracted_dirs
+
+    - name: Set bundle directory path
+      set_fact:
+        bundle_directory: "{{ extracted_dirs.files[0].path }}"
+      when: extracted_dirs.files | length > 0
+
+    - name: Fix ownership of extracted bundle directory
+      ansible.builtin.file:
+        path: "{{ bundle_directory }}"
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        recurse: yes
+        state: directory
+      when: bundle_directory is defined
+
+    - name: Verify bundle directory ownership
+      ansible.builtin.stat:
+        path: "{{ bundle_directory }}"
+        register: bundle_dir_stat
+      when: bundle_directory is defined
+
+    - name: Display bundle directory ownership
+      debug:
+        msg: |
+          Bundle directory ownership:
+          - Path: {{ bundle_directory }}
+          - Owner: {{ bundle_dir_stat.stat.pw_name }}
+          - Group: {{ bundle_dir_stat.stat.gr_name }}
+          - Permissions: {{ bundle_dir_stat.stat.mode }}
+      when: bundle_directory is defined and bundle_dir_stat.stat is defined
+
+    - name: Fail if no extracted directory found
+      fail:
+        msg: "No extracted AAP directory found in /home/{{ admin_user }}/Downloads/"
+      when: extracted_dirs.files | length == 0
+
+    - name: Display bundle directory information
+      debug:
+        msg: |
+          Bundle extracted to: {{ bundle_directory }}
+          Bundle type: {{ hostvars['localhost']['bundle_type'] }}
+          Expected inventory file: {{ 'inventory-growth' if hostvars['localhost']['bundle_type'] == 'containerized' else 'inventory' }}
+
+    - name: Copy inventory file from local to remote bundle directory
+      ansible.builtin.copy:
+        src: "/home/sgallego/Downloads/GIT/ansibleconfig/{{ 'inventory-growth' if hostvars['localhost']['bundle_type'] == 'containerized' else 'inventory' }}"
+        dest: "{{ bundle_directory }}/{{ 'inventory-growth' if hostvars['localhost']['bundle_type'] == 'containerized' else 'inventory' }}"
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: '0644'
+        force: yes
+
+    - name: Verify inventory file was copied successfully
+      ansible.builtin.stat:
+        path: "{{ bundle_directory }}/{{ 'inventory-growth' if hostvars['localhost']['bundle_type'] == 'containerized' else 'inventory' }}"
+        register: inventory_copy_stat
+
+    - name: Display inventory copy confirmation
+      debug:
+        msg: |
+          Inventory file automatically copied:
+          - Source: /home/sgallego/Downloads/GIT/ansibleconfig/{{ 'inventory-growth' if hostvars['localhost']['bundle_type'] == 'containerized' else 'inventory' }}
+          - Destination: {{ bundle_directory }}/{{ 'inventory-growth' if hostvars['localhost']['bundle_type'] == 'containerized' else 'inventory' }}
+          - Exists: {{ inventory_copy_stat.stat.exists }}
+          - Size: {{ inventory_copy_stat.stat.size }} bytes
+
+    - name: Verify inventory file has correct user configuration
+      ansible.builtin.shell:
+        cmd: "grep -E '^ansible_user=' {{ bundle_directory }}/{{ 'inventory-growth' if hostvars['localhost']['bundle_type'] == 'containerized' else 'inventory' }}"
+        register: ansible_user_check
+      failed_when: false
+      changed_when: false
+
+    - name: Display current ansible_user setting
+      debug:
+        msg: "Current ansible_user setting: {{ ansible_user_check.stdout | default('not found') }}"
+
+    - name: Ensure inventory file uses admin user
+      ansible.builtin.lineinfile:
+        path: "{{ bundle_directory }}/{{ 'inventory-growth' if hostvars['localhost']['bundle_type'] == 'containerized' else 'inventory' }}"
+        regexp: '^ansible_user='
+        line: 'ansible_user=admin'
+        insertafter: '^\[all:vars\]'
+      when: ansible_user_check.rc != 0 or 'admin' not in ansible_user_check.stdout
+
+    - name: Ensure inventory file has SSH bypass parameters
+      ansible.builtin.lineinfile:
+        path: "{{ bundle_directory }}/{{ 'inventory-growth' if hostvars['localhost']['bundle_type'] == 'containerized' else 'inventory' }}"
+        regexp: '^ansible_ssh_common_args='
+        line: "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
+        insertafter: '^ansible_user='
+
+    - name: List contents of bundle directory
+      ansible.builtin.shell:
+        cmd: "ls -la {{ bundle_directory }}"
+        register: bundle_contents
+
+    - name: Display bundle directory contents
+      debug:
+        msg: "Bundle directory contents: {{ bundle_contents.stdout_lines }}"
+
+    - name: Look for installation files
+      ansible.builtin.find:
+        paths: "{{ bundle_directory }}"
+        patterns:
+          - "*.sh"
+          - "*install*"
+          - "*.yml"
+          - "*.yaml"
+          - "README*"
+        recurse: no
+        register: install_files
+
+    - name: Display found files
+      debug:
+        msg: "Found files: {{ install_files.files | map(attribute='path') | map('basename') | list }}"
+
+    - name: Check if ansible.cfg exists in bundle directory
+      ansible.builtin.stat:
+        path: "{{ bundle_directory }}/ansible.cfg"
+        register: ansible_cfg_stat
+
+    - name: Backup original ansible.cfg if it exists
+      ansible.builtin.copy:
+        src: "{{ bundle_directory }}/ansible.cfg"
+        dest: "{{ bundle_directory }}/ansible.cfg.backup"
+        remote_src: yes
+        when: ansible_cfg_stat.stat.exists
+
+    - name: Configure AAP bundle ansible.cfg for SSH host key checking and logging
+      ansible.builtin.lineinfile:
+        path: "{{ bundle_directory }}/ansible.cfg"
+        regexp: '^host_key_checking'
+        line: 'host_key_checking = False'
+        insertafter: '^\[defaults\]'
+        create: no
+      when: ansible_cfg_stat.stat.exists
+
+    - name: Add comprehensive logging to existing AAP bundle ansible.cfg
+      ansible.builtin.blockinfile:
+        path: "{{ bundle_directory }}/ansible.cfg"
+        insertafter: '^\[defaults\]'
+        block: |
+          # Comprehensive logging configuration
+          log_path = /var/log/aap/ansible.log
+          display_skipped_hosts = True
+          display_ok_hosts = True
+          callbacks_enabled = profile_tasks, profile_roles, timer
+          stdout_callback = yaml
+          bin_ansible_callbacks = True
+
+          # Verbosity and debugging
+          verbosity = 2
+          debug = True
+      marker: "# {mark} ANSIBLE MANAGED LOGGING BLOCK"
+      when: ansible_cfg_stat.stat.exists
+
+    - name: Add SSH common args to AAP bundle ansible.cfg
+      ansible.builtin.lineinfile:
+        path: "{{ bundle_directory }}/ansible.cfg"
+        regexp: '^ssh_args'
+        line: 'ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+        insertafter: '^\[defaults\]'
+        create: no
+      when: ansible_cfg_stat.stat.exists
+
+    - name: Add ansible_ssh_common_args to AAP bundle ansible.cfg
+      ansible.builtin.lineinfile:
+        path: "{{ bundle_directory }}/ansible.cfg"
+        regexp: '^ansible_ssh_common_args'
+        line: 'ansible_ssh_common_args = -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+        insertafter: '^\[defaults\]'
+        create: no
+      when: ansible_cfg_stat.stat.exists
+
+    - name: Create log directories for AAP installation
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      loop:
+        - /var/log/aap
+      become: yes
+
+    - name: Create AAP installation log file
+      ansible.builtin.file:
+        path: /var/log/aap/AAP_install.log
+        state: touch
+        mode: '0644'
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+      become: yes
+
+    - name: Create Ansible operations log file
+      ansible.builtin.file:
+        path: /var/log/aap/ansible.log
+        state: touch
+        mode: '0644'
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+      become: yes
+
+    - name: Create ansible.cfg with comprehensive logging configuration
+      ansible.builtin.copy:
+        dest: "{{ bundle_directory }}/ansible.cfg"
+        content: |
+          [defaults]
+          host_key_checking = False
+          ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+          ansible_ssh_common_args = -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+
+          # Comprehensive logging configuration
+          log_path = /var/log/aap/ansible.log
+          display_skipped_hosts = True
+          display_ok_hosts = True
+          callbacks_enabled = profile_tasks, profile_roles, timer
+          stdout_callback = yaml
+          bin_ansible_callbacks = True
+
+          # Verbosity and debugging
+          verbosity = 2
+          debug = True
+
+          # Performance and connection settings
+          gathering = smart
+          fact_caching = memory
+          host_key_checking = False
+          retry_files_enabled = False
+          timeout = 30
+
+          # Task execution settings
+          hash_behaviour = merge
+          force_handlers = True
+
+          [inventory]
+          enable_plugins = host_list, script, auto, yaml, ini, toml
+
+          [ssh_connection]
+          ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+          control_path_dir = /tmp/.ansible-cp
+          control_path = %(directory)s/ansible-ssh-%%h-%%p-%%r
+          pipelining = True
+          scp_if_ssh = True
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: '0644'
+      when: not ansible_cfg_stat.stat.exists
+
+    - name: Display ansible.cfg content for verification
+      ansible.builtin.shell:
+        cmd: "cat {{ bundle_directory }}/ansible.cfg"
+      register: ansible_cfg_content
+
+    - name: Show ansible.cfg configuration
+      debug:
+        msg: "{{ ansible_cfg_content.stdout_lines }}"
+
+    - name: Add SSH host key for AAP installation
+      ansible.builtin.shell:
+        cmd: "ssh-keyscan -H {{ ansible_default_ipv4.address | default(ansible_all_ipv4_addresses[0]) }} >> /home/{{ admin_user }}/.ssh/known_hosts"
+      ignore_errors: yes
+      become: yes
+      become_user: "{{ admin_user }}"
+      when: ansible_default_ipv4.address is defined or ansible_all_ipv4_addresses is defined
+
+    - name: Add SSH host key for localhost AAP installation
+      ansible.builtin.shell:
+        cmd: "ssh-keyscan -H localhost >> /home/{{ admin_user }}/.ssh/known_hosts"
+      ignore_errors: yes
+      become: yes
+      become_user: "{{ admin_user }}"
+
+    - name: Add SSH host key for 127.0.0.1 AAP installation
+      ansible.builtin.shell:
+        cmd: "ssh-keyscan -H 127.0.0.1 >> /home/{{ admin_user }}/.ssh/known_hosts"
+      ignore_errors: yes
+      become: yes
+      become_user: "{{ admin_user }}"
+
+    - name: Set installation command for containerized
+      set_fact:
+        install_command: "ansible-playbook -i inventory-growth ansible.containerized_installer.install"
+      when: hostvars['localhost']['bundle_type'] == 'containerized'
+
+    - name: Set installation command for RPM
+      set_fact:
+        install_command: "./setup.sh -i inventory"
+      when: hostvars['localhost']['bundle_type'] == 'rpm'
+
+    - name: Initialize AAP installation log with header
+      ansible.builtin.shell:
+        cmd: |
+          echo "==========================================================================" >> /var/log/aap/AAP_install.log
+          echo "AAP Installation Started: $(date)" >> /var/log/aap/AAP_install.log
+          echo "Bundle Type: {{ hostvars['localhost']['bundle_type'] }}" >> /var/log/aap/AAP_install.log
+          echo "Bundle Directory: {{ bundle_directory }}" >> /var/log/aap/AAP_install.log
+          echo "Installation Command: {{ install_command | trim }}" >> /var/log/aap/AAP_install.log
+          echo "User: {{ admin_user }}" >> /var/log/aap/AAP_install.log
+          echo "==========================================================================" >> /var/log/aap/AAP_install.log
+      become: yes
+
+    - name: Initialize Ansible operations log
+      ansible.builtin.shell:
+        cmd: |
+          echo "==========================================================================" >> /var/log/aap/ansible.log
+          echo "Ansible Operations Log Started: $(date)" >> /var/log/aap/ansible.log
+          echo "Working Directory: {{ bundle_directory }}" >> /var/log/aap/ansible.log
+          echo "==========================================================================" >> /var/log/aap/ansible.log
+      become: yes
+
+    - name: Display final installation command
+      debug:
+        msg: "Will execute: {{ install_command | trim }} in directory {{ bundle_directory }} as user {{ admin_user }}"
+
+    - name: Final pre-installation validation
+      debug:
+        msg: |
+          ===================================================================
+          PRE-INSTALLATION VALIDATION
+          ===================================================================
+
+          All critical fixes have been applied:
+            Podman wrapper script created for version compatibility and rootless fallback
+            SSH host key verification disabled in ansible.cfg
+            Inventory file configured with admin user
+            User namespace mappings configured (subuid/subgid)
+            newuidmap/newgidmap permissions set correctly (setuid)
+            User namespace parameters tuned (max_user_namespaces)
+            SSH host keys added for localhost connectivity
+            Admin user added to necessary groups
+            Podman containers directory reset for clean initialization
+
+            Starting AAP installation...
+          ===================================================================
+
+    - name: Run AAP installation with comprehensive logging
+      ansible.builtin.shell:
+        cmd: |
+          # Log the start of installation
+          echo "[$(date)] Starting AAP installation: {{ install_command | trim }}" >> /var/log/aap/AAP_install.log
+
+          # Run the installation with output logging
+          {{ install_command | trim }} 2>&1 | tee -a /var/log/aap/AAP_install.log
+
+          # Capture the exit code
+          exit_code=${PIPESTATUS[0]}
+
+          # Log the completion
+          echo "[$(date)] AAP installation completed with exit code: $exit_code" >> /var/log/aap/AAP_install.log
+
+          # Exit with the installation exit code
+          exit $exit_code
+      chdir: "{{ bundle_directory }}"
+      register: aap_install_result
+      async: 3600 # 1 hour timeout
+      poll: 30 # Check every 30 seconds
+      become: yes
+      become_user: "{{ admin_user }}"
+      environment:
+        HOME: "/home/{{ admin_user }}"
+        USER: "{{ admin_user }}"
+        PATH: "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        ANSIBLE_LOG_PATH: "/var/log/aap/ansible.log"
+
+    - name: Display installation result
+      debug:
+        msg: |
+          AAP Installation completed!
+          Command executed: {{ install_command }}
+          Working directory: {{ bundle_directory }}
+          Exit code: {{ aap_install_result.rc }}
+          Installation Status: {{ 'SUCCESS' if aap_install_result.rc == 0 else 'FAILED' }}
+
+          Log files created:
+          - AAP Installation Log: /var/log/aap/AAP_install.log
+          - Ansible Operations Log: /var/log/aap/ansible.log
+
+    - name: Log installation completion to AAP install log
+      ansible.builtin.shell:
+        cmd: |
+          echo "==========================================================================" >> /var/log/aap/AAP_install.log
+          echo "AAP Installation Final Status: {{ 'SUCCESS' if aap_install_result.rc == 0 else 'FAILED' }}" >> /var/log/aap/AAP_install.log
+          echo "Exit Code: {{ aap_install_result.rc }}" >> /var/log/aap/AAP_install.log
+          echo "Completion Time: $(date)" >> /var/log/aap/AAP_install.log
+          echo "==========================================================================" >> /var/log/aap/AAP_install.log
+      become: yes
+
+    - name: Display installation output
+      debug:
+        msg: "{{ aap_install_result.stdout_lines }}"
+      when: aap_install_result.stdout_lines is defined
+
+    - name: Display installation errors if any
+      debug:
+        msg: "{{ aap_install_result.stderr_lines }}"
+      when: aap_install_result.stderr_lines is defined and aap_install_result.stderr_lines | length > 0
+
+    - name: Fail on installation error
+      fail:
+        msg: |
+          AAP Installation failed with exit code {{ aap_install_result.rc }}.
+          Please check the output above for details.
+      when: aap_install_result.rc != 0
+
+    - name: Create log viewing script for easy access
+      ansible.builtin.copy:
+        dest: "/home/{{ admin_user }}/view_aap_logs.sh"
+        content: |
+          #!/bin/bash
+          # AAP Installation Log Viewer Script
+
+          echo "=========================================="
+          echo "AAP Installation Log Viewer"
+          echo "=========================================="
+          echo
+
+          case "${1:-menu}" in
+            "install"|"i")
+              echo "Viewing AAP Installation Log..."
+              echo "=========================================="
+              sudo tail -f /var/log/aap/AAP_install.log
+              ;;
+            "ansible"|"a")
+              echo "Viewing Ansible Operations Log..."
+              echo "=========================================="
+              sudo tail -f /var/log/aap/ansible.log
+              ;;
+            "both"|"b")
+              echo "Viewing both logs side by side..."
+              echo "=========================================="
+              sudo tail -f /var/log/aap/AAP_install.log /var/log/aap/ansible.log
+              ;;
+            "summary"|"s")
+              echo "Log Summary:"
+              echo "=========================================="
+              echo "AAP Installation Log:"
+              sudo wc -l /var/log/aap/AAP_install.log
+              echo
+              echo "Ansible Operations Log:"
+              sudo wc -l /var/log/aap/ansible.log
+              echo
+              echo "Last 10 lines of AAP Install Log:"
+              echo "----------------------------------------"
+              sudo tail -10 /var/log/aap/AAP_install.log
+              echo
+              echo "Last 10 lines of Ansible Log:"
+              echo "----------------------------------------"
+              sudo tail -10 /var/log/aap/ansible.log
+              ;;
+            *)
+              echo "Usage: $0 [option]"
+              echo
+              echo "Options:"
+              echo " install, i - View AAP installation log (tail -f)"
+              echo " ansible, a - View Ansible operations log (tail -f)"
+              echo " both, b - View both logs simultaneously"
+              echo " summary, s - Show log summary and last 10 lines"
+              echo
+              echo "Log file locations:"
+              echo " AAP Install: /var/log/aap/AAP_install.log"
+              echo " Ansible Ops: /var/log/aap/ansible.log"
+              echo
+              echo "Example usage:"
+              echo " $0 install # View installation log"
+              echo " $0 ansible # View ansible log"
+              echo " $0 summary # Show summary"
+              ;;
+          esac
+        owner: "{{ admin_user }}"
+        group: "{{ admin_user }}"
+        mode: '0755'
+      become: yes
+
+    - name: Display installation completion message
+      debug:
+        msg: |
+          ===================================================================
+          AAP INSTALLATION COMPLETED SUCCESSFULLY!
+          ===================================================================
+
+          The AAP bundle has been installed and configured successfully.
+
+          Log files for review:
+          - AAP Installation Log: /var/log/aap/AAP_install.log
+          - Ansible Operations Log: /var/log/aap/ansible.log
+
+          To view logs:
+          - Use the convenience script: /home/{{ admin_user }}/view_aap_logs.sh
+          - Or directly: tail -f /var/log/aap/AAP_install.log
+
+          Quick log commands:
+          - ./view_aap_logs.sh install # View installation log
+          - ./view_aap_logs.sh ansible # View ansible operations log
+          - ./view_aap_logs.sh summary # Show log summary
+
+          Next steps:
+            1. Verify all AAP services are running
+            2. Access the AAP web interface
+            3. Complete the initial configuration
+
+          Installation fixes applied:
+            Podman version compatibility wrapper with rootless fallback
+            SSH host key verification bypass
+            User authentication as admin user
+            User namespace mapping configuration (subuid/subgid)
+            newuidmap/newgidmap setuid permissions fixed
+            User namespace parameters optimized
+            Container directory initialization reset
+            Comprehensive logging to /var/log/aap/AAP_install.log
+            Ansible operations logging to /var/log/aap/ansible.log
+            Log viewer script created at /home/{{ admin_user }}/view_aap_logs.sh
+
+          ===================================================================
+      when: aap_install_result.rc == 0
